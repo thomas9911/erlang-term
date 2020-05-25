@@ -19,6 +19,18 @@ defmodule TermGenerator do
         save(%{just: "some key", other: "value"}, "atom_map")
         save([just: "some key", other: "value"], "keyword")
         save({"test", "testing"}, "tuple")
+        save(123456789123456789123456789, "small_big_int")
+        save(Exp.exp(999,999), "large_big_int")
+        # save(&testing/2, "function")
+        save(self(), "pid")
+
+        path = System.find_executable("echo")
+        port = Port.open({:spawn_executable, path}, [:binary, args: ["hello world"]])
+        # save(port, "port")
+        Port.close(port)
+
+        # save(make_ref(), "ref")
+
     end
 
     def save(object, name) do
@@ -36,7 +48,18 @@ defmodule TermGenerator do
 
         save(large_text, path)
     end
+
+    defp testing(_, _), do: nil
 end
 
+
+defmodule Exp do
+  def exp(x,y) when is_integer(x) and is_integer(y) and y>=0 do
+    exp_int(x,y)
+  end
+ 
+  defp exp_int(_,0), do: 1
+  defp exp_int(x,y), do: Enum.reduce(1..y, 1, fn _,acc -> x * acc end)
+end
 
 TermGenerator.generate()

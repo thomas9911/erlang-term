@@ -3,12 +3,15 @@ defmodule TermGenerator do
     @base_path "bins"
     def generate() do
         save(2, "small_int")
+        save(-2, "small_negative_int")
         save(1234578, "int")
+        save(-1234578, "negative_int")
         save(nil, "nil")
         save(false, "false")
         save(true, "true")
         save([], "empty_list")
         save("just some text", "small_string")
+        save(<<1,2,3,4>>, "binary")
         # save_large_string("large_string")
         save(12.515, "float")
         save(:oddţ, "odd_atom")
@@ -17,7 +20,15 @@ defmodule TermGenerator do
         save([1, "some", 2, "text"], "mixed_list")
         save([1, 6 | 2], "improper_list")
         save(%{just: "some key", other: "value"}, "atom_map")
-        save([just: "some key", other: "value"], "keyword")
+        save(%{
+            "float" => 3.14,
+            ["list as a key"] => ["another", %{test: false}],
+            1 => "one",
+            :tuple => {1, :more},
+            "large" => 123456789123456789,
+            "nested" => %{  "ok" => [] }
+        }, "map")
+        save([just: "some key", other: "value", just: 1234], "keyword")
         save({"test", "testing"}, "tuple")
         save(123456789123456789123456789, "small_big_int")
         save(Exp.exp(999,999), "large_big_int")

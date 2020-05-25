@@ -33,9 +33,12 @@ const ATOM_EXT_DEPRECATED: u8 = 100;
 // const SMALL_ATOM_EXT (deprecated) : u8= 115;
 
 // #[macro_use]
+extern crate multimap;
 extern crate nom;
 extern crate num_bigint;
+extern crate num_traits;
 
+use multimap::MultiMap;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take};
 use nom::combinator::all_consuming;
@@ -44,34 +47,108 @@ use nom::multi::{many0, many_m_n};
 use nom::sequence::{preceded, tuple};
 use nom::{Err as NomErr, IResult};
 use num_bigint::{BigInt, Sign};
+use std::collections::HashMap;
+use std::iter::FromIterator;
+
 use std::convert::TryInto;
 use std::fs::File;
 use std::io::{Read, Result as IoResult};
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum RawTerm {
-    // SmallInt(u8),
-    // Int(u32),
-    // Nil,
-    // Atom(String),
-    // List(Vec<RawTerm>),
-    // Charlist(Vec<u8>),
-    // String(String),
-    // Float(f64),
-    // Improper(Box<RawTerm>),
-    // Map(HashMap<String, RawTerm>),
-    // MapArbitrary(Vec<(RawTerm, RawTerm)>),
-    // Keyword(HashMap<String, RawTerm>),
-    // Pair(Box<RawTerm>, Box<RawTerm>),
-    // Tuple(Vec<RawTerm>),
+pub enum Term {
+    Byte(u8),
+    Int(i32),
+    Float(f64),
+    Atom(String),
+    String(String),
+    Bytes(Vec<u8>),
+    Bool(bool),
+    Nil,
+    BigInt(BigInt),
+    Charlist(Vec<u8>),
+    // Keyword(Vec<(String, Term)>),
+    Keyword(MultiMap<String, Term>),
+    List(Vec<Term>),
+    Tuple(Vec<Term>),
+    Map(HashMap<String, Term>),
+    MapArbitrary(Vec<(Term, Term)>),
+    Other(RawTerm),
+}
 
-    // const ATOM_CACHE_REF: u8 = 82;
+impl From<RawTerm> for Term {
+    fn from(term: RawTerm) -> Self {
+        use RawTerm::*;
+        use Term::*;
+        match term {
+            SmallInt(x) => Byte(x),
+            RawTerm::Int(x) => Term::Int(x),
+            RawTerm::Float(x) => Term::Float(x),
+            Binary(x) => {
+                if x.iter().all(|x| x > &31) {
+                    Term::String(std::string::String::from_utf8(x).expect("invalid utf8"))
+                } else {
+                    Bytes(x)
+                }
+            }
+            RawTerm::String(x) => Charlist(x),
+            SmallBigInt(x) => BigInt(x),
+            LargeBigInt(x) => BigInt(x),
+            RawTerm::List(x) => {
+                if x.iter().all(|x| x.is_atom_pair()) {
+                    let map = MultiMap::from_iter(
+                        x.into_iter()
+                            .map(|x| x.as_atom_pair().unwrap())
+                            .map(|(a, b)| (a, Term::from(b))),
+                    );
+                    Term::Keyword(map)
+                } else {
+                    Term::List(raw_term_list_to_term_list(x))
+                }
+            }
+            RawTerm::Nil => Term::List(Vec::new()),
+            SmallTuple(x) => Tuple(raw_term_list_to_term_list(x)),
+            LargeTuple(x) => Tuple(raw_term_list_to_term_list(x)),
+            AtomDeprecated(x) => atom_to_term(x),
+            SmallAtomDeprecated(x) => atom_to_term(x),
+            SmallAtom(x) => atom_to_term(x),
+            RawTerm::Atom(x) => atom_to_term(x),
+            RawTerm::Map(x) if term.is_string_map() => {
+                let map = HashMap::from_iter(
+                    x.into_iter()
+                        .map(|(a, b)| (a.as_string_like().unwrap(), Term::from(b))),
+                );
+                Term::Map(map)
+            }
+            RawTerm::Map(x) => MapArbitrary(
+                x.into_iter()
+                    .map(|(a, b)| (Term::from(a), Term::from(b)))
+                    .collect(),
+            ),
+            x => Other(x),
+        }
+    }
+}
+
+fn raw_term_list_to_term_list(raw_list: Vec<RawTerm>) -> Vec<Term> {
+    raw_list.into_iter().map(|x| Term::from(x)).collect()
+}
+
+fn atom_to_term(atom: String) -> Term {
+    match atom.as_ref() {
+        "false" => Term::Bool(false),
+        "true" => Term::Bool(true),
+        "nil" => Term::Nil,
+        _ => Term::Atom(atom),
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub enum RawTerm {
+    // ATOM_CACHE_REF
     SmallInt(u8),
-    Int(u32),
+    Int(i32),
     OldFloat(String),
-    // PORT,
     // NEW_PORT,
-    // PID,
     // NEW_PID,
     SmallTuple(Vec<RawTerm>),
     LargeTuple(Vec<RawTerm>),
@@ -105,12 +182,11 @@ pub enum RawTerm {
         uniq: [u8; 16],
         index: u32,
         module: Box<RawTerm>,
-        old_index: u32,
-        old_uniq: u32,
+        old_index: i32,
+        old_uniq: i32,
         pid: Box<RawTerm>,
         free_var: Vec<RawTerm>,
     },
-    // NEW_REFERENCE,
     // NEWER_REFERENCE,
     // FUN,
     // EXPORT,
@@ -169,18 +245,90 @@ impl RawTerm {
     //     }
     // }
 
-    // pub fn as_atom_pair(&self) -> Option<(String, RawTerm)> {
-    //     use RawTerm::*;
-    //     match self {
-    //         Pair(x, y) => {
-    //             match *x.clone() {
-    //                 Atom(x) => Some((x, *y.clone())),
-    //                 _ => None,
-    //             }
-    //         },
-    //         _ => None,
-    //     }
-    // }
+    pub fn is_atom(&self) -> bool {
+        use RawTerm::*;
+        match self {
+            Atom(_) | AtomDeprecated(_) | SmallAtom(_) | SmallAtomDeprecated(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_string(&self) -> bool {
+        use RawTerm::*;
+        match self {
+            Binary(_) | String(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_string_like(&self) -> bool {
+        self.is_string() | self.is_atom()
+    }
+
+    pub fn is_integer(&self) -> bool {
+        use RawTerm::*;
+        match self {
+            SmallInt(_) | Int(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_atom_pair(&self) -> bool {
+        use RawTerm::*;
+        match self {
+            SmallTuple(x) if x.len() == 2 => x[0].is_atom(),
+            _ => false,
+        }
+    }
+
+    pub fn is_string_map(&self) -> bool {
+        use RawTerm::*;
+        match self {
+            Map(x) => x.iter().all(|(a, _)| a.is_string_like()),
+            _ => false,
+        }
+    }
+
+    pub fn as_atom(self) -> Option<String> {
+        use RawTerm::*;
+        match self {
+            Atom(x) | AtomDeprecated(x) | SmallAtom(x) | SmallAtomDeprecated(x) => Some(x),
+            _ => None,
+        }
+    }
+
+    pub fn as_string(self) -> Option<String> {
+        match self {
+            RawTerm::Binary(x) | RawTerm::String(x) => {
+                Some(String::from_utf8(x).expect("binary not utf-8"))
+            }
+            _ => None,
+        }
+    }
+
+    pub fn as_string_like(self) -> Option<String> {
+        if self.is_string() {
+            self.as_string()
+        } else if self.is_atom() {
+            self.as_atom()
+        } else {
+            None
+        }
+    }
+
+    pub fn as_atom_pair(self) -> Option<(String, RawTerm)> {
+        use RawTerm::*;
+        match self {
+            SmallTuple(mut x) | LargeTuple(mut x) if x.len() == 2 => {
+                let b = x.pop().unwrap();
+                if let Some(a) = x.pop().unwrap().as_atom() {
+                    return Some((a, b));
+                }
+            }
+            _ => (),
+        }
+        None
+    }
 }
 
 // elixir formats lists with numbers below 32 as lists otherwise as charlists
@@ -277,12 +425,12 @@ fn node_or_module(input: &[u8]) -> IResult<&[u8], RawTerm> {
     ))(input)
 }
 
-fn small_int_or_int(input: &[u8]) -> IResult<&[u8], u32> {
+fn small_int_or_int(input: &[u8]) -> IResult<&[u8], i32> {
     let (i, t) = alt((small_int, int))(input)?;
 
     let x = match t {
         RawTerm::Int(x) => x,
-        RawTerm::SmallInt(x) => x as u32,
+        RawTerm::SmallInt(x) => x as i32,
         _ => unreachable!(),
     };
 
@@ -433,7 +581,7 @@ fn small_int(input: &[u8]) -> IResult<&[u8], RawTerm> {
 
 fn int(input: &[u8]) -> IResult<&[u8], RawTerm> {
     let (i, t) = preceded(tag(&[INTEGER_EXT]), take(4usize))(input)?;
-    let new_int = slice_to_u32(t);
+    let new_int = slice_to_i32(t);
 
     Ok((i, RawTerm::Int(new_int)))
 }
@@ -514,6 +662,11 @@ fn large_big_int(input: &[u8]) -> IResult<&[u8], RawTerm> {
 //     u128::from_be_bytes(new_int)
 // }
 
+fn slice_to_i32(input: &[u8]) -> i32 {
+    let new_int: [u8; 4] = input.try_into().unwrap();
+    i32::from_be_bytes(new_int)
+}
+
 fn slice_to_u32(input: &[u8]) -> u32 {
     let new_int: [u8; 4] = input.try_into().unwrap();
     u32::from_be_bytes(new_int)
@@ -537,7 +690,7 @@ fn slice_to_u8(input: &[u8]) -> u8 {
 // }
 
 #[cfg(test)]
-mod tests {
+mod from_term_tests {
     use crate::{from_term, read_binary, RawTerm};
     use num_bigint::{BigInt, BigUint};
 
@@ -550,11 +703,27 @@ mod tests {
     }
 
     #[test]
+    fn small_negative_int() {
+        let input = read_binary("bins/small_negative_int.bin").unwrap();
+        let out = from_term(&input).unwrap();
+
+        assert_eq!(vec![RawTerm::Int(-2)], out);
+    }
+
+    #[test]
     fn int() {
         let input = read_binary("bins/int.bin").unwrap();
         let out = from_term(&input).unwrap();
 
         assert_eq!(vec![RawTerm::Int(1234578)], out);
+    }
+
+    #[test]
+    fn negative_int() {
+        let input = read_binary("bins/negative_int.bin").unwrap();
+        let out = from_term(&input).unwrap();
+
+        assert_eq!(vec![RawTerm::Int(-1234578)], out);
     }
 
     #[test]
@@ -606,6 +775,14 @@ mod tests {
         let out = from_term(&input).unwrap();
 
         assert_eq!(vec![RawTerm::Binary(b"just some text".to_vec())], out);
+    }
+
+    #[test]
+    fn binary() {
+        let input = read_binary("bins/binary.bin").unwrap();
+        let out = from_term(&input).unwrap();
+
+        assert_eq!(vec![RawTerm::Binary(vec![1, 2, 3, 4])], out);
     }
 
     #[test]
@@ -700,9 +877,59 @@ mod tests {
     }
 
     #[test]
+    fn map() {
+        use RawTerm::*;
+
+        let input = read_binary("bins/map.bin").unwrap();
+        if let Map(mut out) = from_term(&input).unwrap().pop().unwrap() {
+            out.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            // let mut map = Vec::new();
+
+            // map.push((
+            //     RawTerm::AtomDeprecated("just".to_string()),
+            //     RawTerm::Binary(b"some key".to_vec()),
+            // ));
+            // map.push((
+            //     RawTerm::AtomDeprecated("other".to_string()),
+            //     RawTerm::Binary(b"value".to_vec()),
+            // ));
+            let mut map = vec![
+                (Binary(b"float".to_vec()), Float(3.14)),
+                (
+                    List(vec![Binary(b"list as a key".to_vec())]),
+                    List(vec![
+                        Binary(b"another".to_vec()),
+                        Map(vec![(
+                            AtomDeprecated("test".to_string()),
+                            AtomDeprecated("false".to_string()),
+                        )]),
+                    ]),
+                ),
+                (SmallInt(1), Binary(b"one".to_vec())),
+                (
+                    AtomDeprecated("tuple".to_string()),
+                    SmallTuple(vec![SmallInt(1), AtomDeprecated("more".to_string())]),
+                ),
+                (
+                    Binary(b"large".to_vec()),
+                    SmallBigInt(BigInt::parse_bytes(b"123456789123456789", 10).unwrap()),
+                ),
+                (
+                    Binary(b"nested".to_vec()),
+                    Map(vec![(Binary(b"ok".to_vec()), Nil)]),
+                ),
+            ];
+            map.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+            assert_eq!(map, out);
+        } else {
+            assert!(false);
+        }
+    }
+
+    #[test]
     fn keyword() {
         let input = read_binary("bins/keyword.bin").unwrap();
-        println!("{:?}", input);
         let out = from_term(&input).unwrap();
 
         let mut map = Vec::new();
@@ -714,6 +941,10 @@ mod tests {
         map.push(RawTerm::SmallTuple(vec![
             RawTerm::AtomDeprecated("other".to_string()),
             RawTerm::Binary(b"value".to_vec()),
+        ]));
+        map.push(RawTerm::SmallTuple(vec![
+            RawTerm::AtomDeprecated("just".to_string()),
+            RawTerm::Int(1234),
         ]));
 
         assert_eq!(vec![RawTerm::List(map)], out);
@@ -830,5 +1061,122 @@ mod tests {
             }],
             out
         );
+    }
+}
+
+#[cfg(test)]
+mod convert_tests {
+    use crate::{from_term, read_binary, BigInt, HashMap, MultiMap, RawTerm, Term};
+
+    #[test]
+    fn mixed_list() {
+        use crate::Term::*;
+
+        let input = read_binary("bins/mixed_list.bin").unwrap();
+        let out = from_term(&input).unwrap().pop().unwrap();
+
+        assert_eq!(
+            List(vec![
+                Byte(1),
+                String("some".to_string()),
+                Byte(2),
+                String("text".to_string())
+            ]),
+            Term::from(out)
+        );
+    }
+
+    #[test]
+    fn number_list() {
+        use crate::Term::*;
+
+        let input = read_binary("bins/number_list.bin").unwrap();
+        let out = from_term(&input).unwrap().pop().unwrap();
+
+        assert_eq!(Charlist(vec![1, 2, 3, 4]), Term::from(out));
+    }
+
+    #[test]
+    fn binary() {
+        use crate::Term::*;
+
+        let input = read_binary("bins/binary.bin").unwrap();
+        let out = from_term(&input).unwrap().pop().unwrap();
+
+        assert_eq!(Bytes(vec![1, 2, 3, 4]), Term::from(out));
+    }
+
+    #[test]
+    fn keyword() {
+        let input = read_binary("bins/keyword.bin").unwrap();
+        let out = from_term(&input).unwrap().pop().unwrap();
+
+        let mut expected = MultiMap::new();
+        expected.insert("just".to_string(), Term::String("some key".to_string()));
+        expected.insert("other".to_string(), Term::String("value".to_string()));
+        expected.insert("just".to_string(), Term::Int(1234));
+
+        assert_eq!(Term::Keyword(expected), Term::from(out));
+    }
+
+    #[test]
+    fn atom_map() {
+        let input = read_binary("bins/atom_map.bin").unwrap();
+        let out = from_term(&input).unwrap().pop().unwrap();
+
+        let mut expected = HashMap::new();
+        expected.insert("just".to_string(), Term::String("some key".to_string()));
+        expected.insert("other".to_string(), Term::String("value".to_string()));
+
+        assert_eq!(Term::Map(expected), Term::from(out));
+    }
+
+    #[test]
+    fn map() {
+        let input = read_binary("bins/map.bin").unwrap();
+        let out = from_term(&input).unwrap().pop().unwrap();
+
+        let mut sub = HashMap::new();
+        sub.insert("test".to_string(), Term::Bool(false));
+        let mut nested = HashMap::new();
+        nested.insert("ok".to_string(), Term::List(Vec::new()));
+
+        let expected = vec![
+            (Term::Byte(1), Term::String("one".to_string())),
+            (
+                Term::Atom("tuple".to_string()),
+                Term::Tuple(vec![Term::Byte(1), Term::Atom("more".to_string())]),
+            ),
+            (
+                Term::List(vec![Term::String("list as a key".to_string())]),
+                Term::List(vec![Term::String("another".to_string()), Term::Map(sub)]),
+            ),
+            (Term::String("float".to_string()), Term::Float(3.14)),
+            (
+                Term::String("large".to_string()),
+                Term::BigInt(BigInt::parse_bytes(b"123456789123456789", 10).unwrap()),
+            ),
+            (Term::String("nested".to_string()), Term::Map(nested)),
+        ];
+
+        assert_eq!(Term::MapArbitrary(expected), Term::from(out));
+    }
+
+    #[test]
+    fn nil() {
+        let out = RawTerm::Atom("nil".to_string());
+        assert_eq!(Term::Nil, Term::from(out));
+    }
+
+    #[test]
+    fn false_test() {
+        let out = RawTerm::Atom("false".to_string());
+        assert_eq!(Term::Bool(false), Term::from(out));
+    }
+
+    #[test]
+    fn true_test() {
+        let out = RawTerm::Atom("true".to_string());
+        assert_eq!(Term::Bool(true), Term::from(out));
     }
 }

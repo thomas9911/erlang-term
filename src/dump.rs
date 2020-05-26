@@ -24,6 +24,27 @@ pub fn internal_to_binary(raw: RawTerm, add_prefix: bool) -> Vec<u8> {
         LargeTuple(x) => large_tuple(x, add_prefix),
         List(x) => list(x, add_prefix),
         Map(x) => map(x, add_prefix),
+        Port { node, id, creation } => port(*node, id, creation, add_prefix),
+        Ref { node, id, creation } => reference(*node, id, creation, add_prefix),
+        Pid {
+            node,
+            id,
+            serial,
+            creation,
+        } => pid(*node, id, serial, creation, add_prefix),
+        Function {
+            size,
+            arity,
+            uniq,
+            index,
+            module,
+            old_index,
+            old_uniq,
+            pid,
+            free_var,
+        } => function(
+            size, arity, uniq, index, *module, *old_index, *old_uniq, *pid, free_var, add_prefix,
+        ),
 
         _ => unreachable!(),
     }
@@ -241,7 +262,6 @@ fn list(mut raw: Vec<RawTerm>, add_prefix: bool) -> Vec<u8> {
         .collect();
 
     let mut buffer = Vec::with_capacity(bytes.len() + 6);
-
     if add_prefix {
         push_prefix(&mut buffer)
     };
@@ -271,6 +291,99 @@ fn map(raw: Vec<(RawTerm, RawTerm)>, add_prefix: bool) -> Vec<u8> {
     buffer.push(MAP_EXT);
     buffer.extend(&(arity as u32).to_be_bytes());
     buffer.extend(bytes.drain(..));
+    buffer
+}
+
+fn port(node: RawTerm, id: u32, creation: u8, add_prefix: bool) -> Vec<u8> {
+    let node_binary = internal_to_binary(node, false);
+
+    let mut buffer = Vec::with_capacity(node_binary.len() + 7);
+
+    if add_prefix {
+        push_prefix(&mut buffer)
+    };
+    buffer.push(PORT_EXT);
+    buffer.extend(node_binary);
+    buffer.extend(&(id as u32).to_be_bytes());
+    buffer.push(creation);
+    buffer
+}
+
+fn reference(node: RawTerm, id: Vec<u32>, creation: u8, add_prefix: bool) -> Vec<u8> {
+    let id_length = id.len();
+    let node_binary = internal_to_binary(node, false);
+    let mut id_bytes: Vec<u8> = Vec::new();
+    for part in id {
+        id_bytes.extend(&(part as u32).to_be_bytes());
+    }
+
+    let mut buffer = Vec::with_capacity(node_binary.len() + id_bytes.len() + 5);
+
+    if add_prefix {
+        push_prefix(&mut buffer)
+    };
+    buffer.push(NEW_REFERENCE_EXT);
+    buffer.extend(&(id_length as u16).to_be_bytes());
+    buffer.extend(node_binary);
+    buffer.push(creation);
+    buffer.extend(id_bytes);
+    buffer
+}
+
+fn pid(node: RawTerm, id: u32, serial: u32, creation: u8, add_prefix: bool) -> Vec<u8> {
+    let node_binary = internal_to_binary(node, false);
+
+    let mut buffer = Vec::with_capacity(node_binary.len() + 11);
+
+    if add_prefix {
+        push_prefix(&mut buffer)
+    };
+    buffer.push(PID_EXT);
+    buffer.extend(node_binary);
+    buffer.extend(&(id as u32).to_be_bytes());
+    buffer.extend(&(serial as u32).to_be_bytes());
+    buffer.push(creation);
+    buffer
+}
+
+fn function(
+    size: u32,
+    arity: u8,
+    uniq: [u8; 16],
+    index: u32,
+    module: RawTerm,
+    old_index: RawTerm,
+    old_uniq: RawTerm,
+    pid: RawTerm,
+    free_var: Vec<RawTerm>,
+    add_prefix: bool,
+) -> Vec<u8> {
+    let free_var_length = free_var.len();
+    let module_binary = internal_to_binary(module, false);
+    let pid_binary = internal_to_binary(pid, false);
+    let old_index = internal_to_binary(old_index, false);
+    let old_uniq = internal_to_binary(old_uniq, false);
+    let free_var_bytes: Vec<u8> = free_var
+        .into_iter()
+        .flat_map(|x| internal_to_binary(x, false))
+        .collect();
+
+    let mut buffer =
+        Vec::with_capacity(module_binary.len() + pid_binary.len() + free_var_bytes.len() + 31);
+    if add_prefix {
+        push_prefix(&mut buffer)
+    };
+    buffer.push(NEW_FUN_EXT);
+    buffer.extend(&size.to_be_bytes());
+    buffer.push(arity);
+    buffer.extend(&uniq);
+    buffer.extend(&index.to_be_bytes());
+    buffer.extend(&(free_var_length as u32).to_be_bytes());
+    buffer.extend(module_binary);
+    buffer.extend(old_index);
+    buffer.extend(old_uniq);
+    buffer.extend(pid_binary);
+    buffer.extend(free_var_bytes);
     buffer
 }
 
@@ -497,5 +610,109 @@ mod binary_tests {
                 101
             ]
         );
+    }
+
+    #[test]
+    fn port() {
+        let out = to_binary(RawTerm::Port {
+            node: Box::new(RawTerm::SmallAtom("something@something".to_string())),
+            id: 123,
+            creation: 2,
+        });
+
+        assert_eq!(
+            out,
+            vec![
+                REVISION, 102, 119, 19, 115, 111, 109, 101, 116, 104, 105, 110, 103, 64, 115, 111,
+                109, 101, 116, 104, 105, 110, 103, 0, 0, 0, 123, 2
+            ]
+        )
+    }
+
+    #[test]
+    fn reference() {
+        let out = to_binary(RawTerm::Ref {
+            node: Box::new(RawTerm::AtomDeprecated("something@something".to_string())),
+            id: vec![158726, 438566918, 237133],
+            creation: 2,
+        });
+
+        assert_eq!(
+            out,
+            vec![
+                REVISION, 114, 0, 3, 100, 0, 19, 115, 111, 109, 101, 116, 104, 105, 110, 103, 64,
+                115, 111, 109, 101, 116, 104, 105, 110, 103, 2, 0, 2, 108, 6, 26, 36, 0, 6, 0, 3,
+                158, 77
+            ]
+        )
+    }
+
+    #[test]
+    fn pid() {
+        let out = to_binary(RawTerm::Pid {
+            node: Box::new(RawTerm::SmallAtom("something@something".to_string())),
+            id: 123,
+            serial: 654,
+            creation: 2,
+        });
+
+        assert_eq!(
+            out,
+            vec![
+                REVISION, 103, 119, 19, 115, 111, 109, 101, 116, 104, 105, 110, 103, 64, 115, 111,
+                109, 101, 116, 104, 105, 110, 103, 0, 0, 0, 123, 0, 0, 2, 142, 2
+            ]
+        )
+    }
+
+    #[test]
+    fn function() {
+        let input = RawTerm::Function {
+            size: 134,
+            arity: 0,
+            uniq: [
+                241, 72, 50, 109, 70, 84, 198, 45, 20, 94, 42, 25, 184, 243, 5, 100,
+            ],
+            index: 21,
+            module: Box::new(RawTerm::AtomDeprecated("erl_eval".to_string())),
+            old_index: Box::new(RawTerm::SmallInt(21)),
+            old_uniq: Box::new(RawTerm::Int(126501267)),
+            pid: Box::new(RawTerm::Pid {
+                node: Box::new(RawTerm::AtomDeprecated("nonode@nohost".to_string())),
+                id: 102,
+                serial: 0,
+                creation: 0,
+            }),
+            free_var: vec![RawTerm::SmallTuple(vec![
+                RawTerm::Nil,
+                RawTerm::AtomDeprecated("none".to_string()),
+                RawTerm::AtomDeprecated("none".to_string()),
+                RawTerm::List(vec![RawTerm::SmallTuple(vec![
+                    RawTerm::AtomDeprecated("clause".to_string()),
+                    RawTerm::SmallInt(3),
+                    RawTerm::Nil,
+                    RawTerm::Nil,
+                    RawTerm::List(vec![RawTerm::SmallTuple(vec![
+                        RawTerm::AtomDeprecated("atom".to_string()),
+                        RawTerm::SmallInt(0),
+                        RawTerm::AtomDeprecated("nil".to_string()),
+                    ])]),
+                ])]),
+            ])],
+        };
+        let out = to_binary(input);
+
+        assert_eq!(
+            out,
+            vec![
+                REVISION, 112, 0, 0, 0, 134, 0, 241, 72, 50, 109, 70, 84, 198, 45, 20, 94, 42, 25,
+                184, 243, 5, 100, 0, 0, 0, 21, 0, 0, 0, 1, 100, 0, 8, 101, 114, 108, 95, 101, 118,
+                97, 108, 97, 21, 98, 7, 138, 65, 147, 103, 100, 0, 13, 110, 111, 110, 111, 100,
+                101, 64, 110, 111, 104, 111, 115, 116, 0, 0, 0, 102, 0, 0, 0, 0, 0, 104, 4, 106,
+                100, 0, 4, 110, 111, 110, 101, 100, 0, 4, 110, 111, 110, 101, 108, 0, 0, 0, 1, 104,
+                5, 100, 0, 6, 99, 108, 97, 117, 115, 101, 97, 3, 106, 106, 108, 0, 0, 0, 1, 104, 3,
+                100, 0, 4, 97, 116, 111, 109, 97, 0, 100, 0, 3, 110, 105, 108, 106, 106
+            ]
+        )
     }
 }

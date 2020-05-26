@@ -95,16 +95,8 @@ fn node_or_module(input: &[u8]) -> IResult<&[u8], RawTerm> {
     ))(input)
 }
 
-fn small_int_or_int(input: &[u8]) -> IResult<&[u8], i32> {
-    let (i, t) = alt((small_int, int))(input)?;
-
-    let x = match t {
-        RawTerm::Int(x) => x,
-        RawTerm::SmallInt(x) => x as i32,
-        _ => unreachable!(),
-    };
-
-    Ok((i, x))
+fn small_int_or_int(input: &[u8]) -> IResult<&[u8], RawTerm> {
+    alt((small_int, int))(input)
 }
 
 fn pid(input: &[u8]) -> IResult<&[u8], RawTerm> {
@@ -192,8 +184,8 @@ fn function(input: &[u8]) -> IResult<&[u8], RawTerm> {
             uniq,
             index,
             module: Box::new(module),
-            old_index,
-            old_uniq,
+            old_index: Box::new(old_index),
+            old_uniq: Box::new(old_uniq),
             pid: Box::new(pid),
             free_var: free_vars,
         },

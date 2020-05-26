@@ -22,7 +22,7 @@ pub fn from_term(input: &[u8]) -> Result<Vec<RawTerm>, NomErr<(&[u8], ErrorKind)
 pub fn parser(input: &[u8]) -> IResult<&[u8], Vec<RawTerm>> {
     // pub fn parser(input: &[u8]) -> Result<Vec<RawTerm>, NomErr<(&[u8], ErrorKind)>> {
     // pub fn parser(input: &[u8]) -> Result<Vec<RawTerm>, &[u8]> {
-    all_consuming(preceded(tag(&[START]), many0(term)))(input)
+    all_consuming(preceded(tag(&[REVISION]), many0(term)))(input)
 }
 
 fn term(input: &[u8]) -> IResult<&[u8], RawTerm> {

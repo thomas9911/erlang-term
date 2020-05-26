@@ -7,7 +7,7 @@ pub enum RawTerm {
     // ATOM_CACHE_REF
     SmallInt(u8),
     Int(i32),
-    OldFloat(String),
+    // OldFloat(String),
     // NEW_PORT,
     // NEW_PID,
     SmallTuple(Vec<RawTerm>),
@@ -62,6 +62,10 @@ pub enum RawTerm {
 impl RawTerm {
     pub fn from_bytes(input: &[u8]) -> Result<Vec<RawTerm>, NomErr<(&[u8], ErrorKind)>> {
         crate::from_term(input)
+    }
+
+    pub fn to_bytes(self) -> Vec<u8> {
+        crate::to_binary(self)
     }
 
     pub fn is_atom(&self) -> bool {

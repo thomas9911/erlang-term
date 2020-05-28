@@ -12,7 +12,7 @@ use num_bigint::{BigInt, Sign};
 
 use std::convert::TryInto;
 
-pub fn from_term(input: &[u8]) -> Result<RawTerm, NomErr<(&[u8], ErrorKind)>> {
+pub fn from_bytes(input: &[u8]) -> Result<RawTerm, NomErr<(&[u8], ErrorKind)>> {
     let (_, mut output) = parser(input)?;
     // many0(small_int)(input)
 

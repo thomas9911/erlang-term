@@ -63,12 +63,12 @@ pub enum RawTerm {
 }
 
 impl RawTerm {
-    pub fn try_from_bytes(input: &[u8]) -> Result<RawTerm, NomErr<(&[u8], ErrorKind)>> {
-        crate::from_term(input)
+    pub fn from_bytes(input: &[u8]) -> Result<RawTerm, NomErr<(&[u8], ErrorKind)>> {
+        crate::from_bytes(input)
     }
 
     pub fn to_bytes(self) -> Vec<u8> {
-        crate::to_binary(self)
+        crate::to_bytes(self)
     }
 
     pub fn is_atom(&self) -> bool {
@@ -244,13 +244,13 @@ fn atom_to_raw_term(input: String) -> RawTerm {
 
 #[cfg(test)]
 mod from_term_tests {
-    use crate::{from_term, read_binary, RawTerm};
+    use crate::{from_bytes, read_binary, RawTerm};
     use num_bigint::{BigInt, BigUint};
 
     #[test]
     fn small_int() {
         let input = read_binary("bins/small_int.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         assert_eq!(RawTerm::SmallInt(2), out);
     }
@@ -258,7 +258,7 @@ mod from_term_tests {
     #[test]
     fn small_negative_int() {
         let input = read_binary("bins/small_negative_int.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         assert_eq!(RawTerm::Int(-2), out);
     }
@@ -266,7 +266,7 @@ mod from_term_tests {
     #[test]
     fn int() {
         let input = read_binary("bins/int.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         assert_eq!(RawTerm::Int(1234578), out);
     }
@@ -274,7 +274,7 @@ mod from_term_tests {
     #[test]
     fn negative_int() {
         let input = read_binary("bins/negative_int.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         assert_eq!(RawTerm::Int(-1234578), out);
     }
@@ -282,7 +282,7 @@ mod from_term_tests {
     #[test]
     fn nil() {
         let input = read_binary("bins/nil.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         assert_eq!(RawTerm::AtomDeprecated("nil".to_string()), out);
     }
@@ -290,7 +290,7 @@ mod from_term_tests {
     #[test]
     fn false_test() {
         let input = read_binary("bins/false.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         assert_eq!(RawTerm::AtomDeprecated("false".to_string()), out);
     }
@@ -298,7 +298,7 @@ mod from_term_tests {
     #[test]
     fn true_test() {
         let input = read_binary("bins/true.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         assert_eq!(RawTerm::AtomDeprecated("true".to_string()), out);
     }
@@ -306,7 +306,7 @@ mod from_term_tests {
     #[test]
     fn odd_atom() {
         let input = read_binary("bins/odd_atom.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         assert_eq!(RawTerm::SmallAtom("oddţ".to_string()), out);
     }
@@ -314,7 +314,7 @@ mod from_term_tests {
     #[test]
     fn module_name() {
         let input = read_binary("bins/module_name.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         assert_eq!(
             RawTerm::AtomDeprecated("Elixir.TermGenerator".to_string()),
@@ -325,7 +325,7 @@ mod from_term_tests {
     #[test]
     fn small_string() {
         let input = read_binary("bins/small_string.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         assert_eq!(RawTerm::Binary(b"just some text".to_vec()), out);
     }
@@ -333,7 +333,7 @@ mod from_term_tests {
     #[test]
     fn binary() {
         let input = read_binary("bins/binary.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         assert_eq!(RawTerm::Binary(vec![1, 2, 3, 4]), out);
     }
@@ -341,7 +341,7 @@ mod from_term_tests {
     #[test]
     fn large_string() {
         let input = read_binary("bins/large_string.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         if let RawTerm::Binary(x) = &out {
             assert!(x.starts_with(b"Lorem ipsum dolor sit"))
@@ -353,7 +353,7 @@ mod from_term_tests {
     #[test]
     fn float() {
         let input = read_binary("bins/float.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         assert_eq!(RawTerm::Float(12.515), out);
     }
@@ -361,7 +361,7 @@ mod from_term_tests {
     #[test]
     fn empty_list() {
         let input = read_binary("bins/empty_list.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         // assert_eq!(vec![RawTerm::List(vec![])], out);
         assert_eq!(RawTerm::Nil, out);
@@ -370,7 +370,7 @@ mod from_term_tests {
     #[test]
     fn number_list() {
         let input = read_binary("bins/number_list.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         assert_eq!(RawTerm::String(vec![1, 2, 3, 4]), out);
     }
@@ -380,7 +380,7 @@ mod from_term_tests {
         use crate::RawTerm::*;
 
         let input = read_binary("bins/mixed_list.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         assert_eq!(
             List(vec![
@@ -398,7 +398,7 @@ mod from_term_tests {
         use crate::RawTerm::*;
 
         let input = read_binary("bins/improper_list.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         assert_eq!(
             List(vec![
@@ -413,7 +413,7 @@ mod from_term_tests {
     #[test]
     fn atom_map() {
         let input = read_binary("bins/atom_map.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         let mut map = Vec::new();
 
@@ -434,7 +434,7 @@ mod from_term_tests {
         use RawTerm::*;
 
         let input = read_binary("bins/map.bin").unwrap();
-        if let Map(mut out) = from_term(&input).unwrap() {
+        if let Map(mut out) = from_bytes(&input).unwrap() {
             out.sort_by(|a, b| a.partial_cmp(b).unwrap());
             // let mut map = Vec::new();
 
@@ -483,7 +483,7 @@ mod from_term_tests {
     #[test]
     fn keyword() {
         let input = read_binary("bins/keyword.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         let mut map = Vec::new();
 
@@ -506,7 +506,7 @@ mod from_term_tests {
     #[test]
     fn tuple() {
         let input = read_binary("bins/tuple.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
         assert_eq!(
             RawTerm::SmallTuple(vec![
                 RawTerm::Binary(b"test".to_vec()),
@@ -519,7 +519,7 @@ mod from_term_tests {
     #[test]
     fn small_big_int() {
         let input = read_binary("bins/small_big_int.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
         assert_eq!(
             RawTerm::SmallBigInt(BigInt::parse_bytes(b"123456789123456789123456789", 10).unwrap()),
             out
@@ -531,7 +531,7 @@ mod from_term_tests {
         use num_traits::pow::Pow;
 
         let input = read_binary("bins/large_big_int.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
         let nineninenine = BigUint::parse_bytes(b"999", 10).unwrap();
 
         assert_eq!(
@@ -543,7 +543,7 @@ mod from_term_tests {
     #[test]
     fn pid() {
         let input = read_binary("bins/pid.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         assert_eq!(
             RawTerm::Pid {
@@ -559,7 +559,7 @@ mod from_term_tests {
     #[test]
     fn function() {
         let input = read_binary("bins/function.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         assert_eq!(
             RawTerm::Function {
@@ -585,7 +585,7 @@ mod from_term_tests {
     #[test]
     fn port() {
         let input = read_binary("bins/port.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         assert_eq!(
             RawTerm::Port {
@@ -600,7 +600,7 @@ mod from_term_tests {
     #[test]
     fn reference() {
         let input = read_binary("bins/ref.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         assert_eq!(
             RawTerm::Ref {

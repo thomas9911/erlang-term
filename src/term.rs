@@ -4,6 +4,8 @@ use keylist::Keylist;
 use num_bigint::BigInt;
 use std::collections::HashMap;
 use std::iter::FromIterator;
+use nom::error::ErrorKind;
+use nom::Err as NomErr;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -97,6 +99,14 @@ fn atom_to_term(atom: String) -> Term {
     }
 }
 impl Term {
+    pub fn from_bytes(input: &[u8]) ->  Result<Term, NomErr<(&[u8], ErrorKind)>> {
+        Ok(Term::from(RawTerm::from_bytes(input)?))
+    }
+
+    pub fn to_bytes(self) -> Vec<u8> {
+        RawTerm::from(self).to_bytes()
+    }
+
     pub fn as_bool(self) -> Option<bool> {
         use Term::*;
         match self {
@@ -215,7 +225,7 @@ impl Term {
 
 #[cfg(test)]
 mod convert_tests {
-    use crate::{from_term, read_binary, RawTerm, Term};
+    use crate::{from_bytes, read_binary, RawTerm, Term};
     use keylist::Keylist;
     use num_bigint::BigInt;
     use std::collections::HashMap;
@@ -225,7 +235,7 @@ mod convert_tests {
         use crate::Term::*;
 
         let input = read_binary("bins/mixed_list.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         assert_eq!(
             List(vec![
@@ -243,7 +253,7 @@ mod convert_tests {
         use crate::Term::*;
 
         let input = read_binary("bins/number_list.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         assert_eq!(Charlist(vec![1, 2, 3, 4]), Term::from(out));
     }
@@ -253,7 +263,7 @@ mod convert_tests {
         use crate::Term::*;
 
         let input = read_binary("bins/binary.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         assert_eq!(Bytes(vec![1, 2, 3, 4]), Term::from(out));
     }
@@ -261,7 +271,7 @@ mod convert_tests {
     #[test]
     fn keyword() {
         let input = read_binary("bins/keyword.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         let mut expected = Keylist::new();
         expected.push("just".to_string(), Term::String("some key".to_string()));
@@ -274,7 +284,7 @@ mod convert_tests {
     #[test]
     fn atom_map() {
         let input = read_binary("bins/atom_map.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         let mut expected = HashMap::new();
         expected.insert("just".to_string(), Term::String("some key".to_string()));
@@ -288,7 +298,7 @@ mod convert_tests {
         use std::iter::FromIterator;
 
         let input = read_binary("bins/map.bin").unwrap();
-        let out = from_term(&input).unwrap();
+        let out = from_bytes(&input).unwrap();
 
         let mut sub = HashMap::new();
         sub.insert("test".to_string(), Term::Bool(false));
@@ -354,7 +364,7 @@ fn serde_test_json_round_trip() {
     let term: Term = serde_json::from_value(value.clone()).unwrap();
     let raw_term = RawTerm::from(term);
     let bytes = raw_term.to_bytes();
-    let new_raw_term = RawTerm::try_from_bytes(&bytes).unwrap();
+    let new_raw_term = RawTerm::from_bytes(&bytes).unwrap();
     let new_term = Term::from(new_raw_term);
     let json = serde_json::to_value(&new_term).unwrap();
 
@@ -413,22 +423,18 @@ fn serde_test_elixir_round_trip() {
         110, 105, 108, 106,
     ];
 
-    let raw_term = RawTerm::try_from_bytes(&adjusted_input).unwrap();
-    let term = Term::from(raw_term);
+    let term = Term::from_bytes(&adjusted_input).unwrap();
     let json = serde_json::to_value(&term).unwrap();
     let new_term: Term = serde_json::from_value(json).unwrap();
-    let new_raw_term = RawTerm::from(new_term);
-    let output = new_raw_term.to_bytes();
+    let output = new_term.to_bytes();
 
     assert_eq!(adjusted_input, output);
 
     // bonus: the input will be transformed to adjusted input
-    let raw_term = RawTerm::try_from_bytes(&input).unwrap();
-    let term = Term::from(raw_term);
+    let term = Term::from_bytes(&input).unwrap();
     let json = serde_json::to_value(&term).unwrap();
     let new_term: Term = serde_json::from_value(json).unwrap();
-    let new_raw_term = RawTerm::from(new_term);
-    let output = new_raw_term.to_bytes();
+    let output = new_term.to_bytes();
 
     assert_eq!(adjusted_input, output);
 }

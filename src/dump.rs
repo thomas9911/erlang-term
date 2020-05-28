@@ -1,7 +1,7 @@
 use crate::consts::*;
 use crate::RawTerm;
 use num_bigint::{BigInt, Sign};
-pub fn to_binary(raw: RawTerm) -> Vec<u8> {
+pub fn to_bytes(raw: RawTerm) -> Vec<u8> {
     internal_to_binary(raw, true)
 }
 
@@ -396,63 +396,63 @@ fn sign_to_byte(sign: Sign) -> u8 {
 #[cfg(test)]
 mod binary_tests {
     use crate::consts::REVISION;
-    use crate::{read_binary, to_binary, RawTerm};
+    use crate::{read_binary, to_bytes, RawTerm};
     use num_bigint::{BigInt, BigUint};
 
     #[test]
     fn small_atom() {
-        let out = to_binary(RawTerm::SmallAtom("test".to_string()));
+        let out = to_bytes(RawTerm::SmallAtom("test".to_string()));
         assert_eq!(out, vec![REVISION, 119, 4, 116, 101, 115, 116])
     }
 
     #[test]
     fn atom() {
-        let out = to_binary(RawTerm::Atom("test".to_string()));
+        let out = to_bytes(RawTerm::Atom("test".to_string()));
         assert_eq!(out, vec![REVISION, 118, 0, 4, 116, 101, 115, 116])
     }
 
     #[test]
     fn small_atom_deprecated() {
-        let out = to_binary(RawTerm::SmallAtomDeprecated("test".to_string()));
+        let out = to_bytes(RawTerm::SmallAtomDeprecated("test".to_string()));
         assert_eq!(out, vec![REVISION, 115, 4, 116, 101, 115, 116])
     }
 
     #[test]
     fn atom_deprecated() {
-        let out = to_binary(RawTerm::AtomDeprecated("test".to_string()));
+        let out = to_bytes(RawTerm::AtomDeprecated("test".to_string()));
         assert_eq!(out, vec![REVISION, 100, 0, 4, 116, 101, 115, 116])
     }
 
     #[test]
     fn float() {
-        let out = to_binary(RawTerm::Float(3.14));
+        let out = to_bytes(RawTerm::Float(3.14));
         assert_eq!(out, vec![REVISION, 70, 64, 9, 30, 184, 81, 235, 133, 31])
     }
 
     #[test]
     fn nil() {
-        let out = to_binary(RawTerm::Nil);
+        let out = to_bytes(RawTerm::Nil);
         assert_eq!(out, vec![REVISION, 106])
     }
 
     #[test]
     fn small_int() {
-        let out = to_binary(RawTerm::SmallInt(4));
+        let out = to_bytes(RawTerm::SmallInt(4));
         assert_eq!(out, vec![REVISION, 97, 4])
     }
 
     #[test]
     fn int() {
-        let out = to_binary(RawTerm::Int(-13));
+        let out = to_bytes(RawTerm::Int(-13));
         assert_eq!(out, vec![REVISION, 98, 255, 255, 255, 243]);
 
-        let out = to_binary(RawTerm::Int(12345));
+        let out = to_bytes(RawTerm::Int(12345));
         assert_eq!(out, vec![REVISION, 98, 0, 0, 48, 57])
     }
 
     #[test]
     fn string() {
-        let out = to_binary(RawTerm::String(b"testing".to_vec()));
+        let out = to_bytes(RawTerm::String(b"testing".to_vec()));
         assert_eq!(
             out,
             vec![REVISION, 107, 0, 7, 116, 101, 115, 116, 105, 110, 103]
@@ -461,7 +461,7 @@ mod binary_tests {
 
     #[test]
     fn binary() {
-        let out = to_binary(RawTerm::Binary(b"testing".to_vec()));
+        let out = to_bytes(RawTerm::Binary(b"testing".to_vec()));
         assert_eq!(
             out,
             vec![REVISION, 109, 0, 0, 0, 7, 116, 101, 115, 116, 105, 110, 103]
@@ -470,7 +470,7 @@ mod binary_tests {
 
     #[test]
     fn small_big_int() {
-        let out = to_binary(RawTerm::SmallBigInt(
+        let out = to_bytes(RawTerm::SmallBigInt(
             BigInt::parse_bytes(b"123456789123456789123456789", 10).unwrap(),
         ));
         assert_eq!(
@@ -485,7 +485,7 @@ mod binary_tests {
 
         let expected = read_binary("bins/large_big_int.bin").unwrap();
         let nineninenine = BigUint::parse_bytes(b"999", 10).unwrap();
-        let out = to_binary(RawTerm::LargeBigInt(BigInt::from(
+        let out = to_bytes(RawTerm::LargeBigInt(BigInt::from(
             nineninenine.pow(&nineninenine),
         )));
 
@@ -494,7 +494,7 @@ mod binary_tests {
 
     #[test]
     fn small_tuple() {
-        let out = to_binary(RawTerm::SmallTuple(vec![
+        let out = to_bytes(RawTerm::SmallTuple(vec![
             RawTerm::String(b"testing".to_vec()),
             RawTerm::SmallInt(1),
         ]));
@@ -507,7 +507,7 @@ mod binary_tests {
 
     #[test]
     fn large_tuple() {
-        let out = to_binary(RawTerm::LargeTuple(vec![
+        let out = to_bytes(RawTerm::LargeTuple(vec![
             RawTerm::String(b"testing".to_vec()),
             RawTerm::SmallInt(1),
         ]));
@@ -520,7 +520,7 @@ mod binary_tests {
 
     #[test]
     fn list() {
-        let out = to_binary(RawTerm::List(vec![RawTerm::String(b"testing".to_vec())]));
+        let out = to_bytes(RawTerm::List(vec![RawTerm::String(b"testing".to_vec())]));
 
         assert_eq!(
             out,
@@ -530,7 +530,7 @@ mod binary_tests {
 
     #[test]
     fn improper_list() {
-        let out = to_binary(RawTerm::List(vec![
+        let out = to_bytes(RawTerm::List(vec![
             RawTerm::String(b"testing".to_vec()),
             RawTerm::Improper(Box::new(RawTerm::SmallInt(3))),
         ]));
@@ -543,7 +543,7 @@ mod binary_tests {
 
     #[test]
     fn atom_map() {
-        let out = to_binary(RawTerm::Map(vec![
+        let out = to_bytes(RawTerm::Map(vec![
             (
                 RawTerm::AtomDeprecated("other".to_string()),
                 RawTerm::Binary(b"test".to_vec()),
@@ -593,7 +593,7 @@ mod binary_tests {
             ),
         ];
         map.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        let out = to_binary(RawTerm::Map(map));
+        let out = to_bytes(RawTerm::Map(map));
 
         assert_eq!(
             out,
@@ -613,7 +613,7 @@ mod binary_tests {
 
     #[test]
     fn port() {
-        let out = to_binary(RawTerm::Port {
+        let out = to_bytes(RawTerm::Port {
             node: Box::new(RawTerm::SmallAtom("something@something".to_string())),
             id: 123,
             creation: 2,
@@ -630,7 +630,7 @@ mod binary_tests {
 
     #[test]
     fn reference() {
-        let out = to_binary(RawTerm::Ref {
+        let out = to_bytes(RawTerm::Ref {
             node: Box::new(RawTerm::AtomDeprecated("something@something".to_string())),
             id: vec![158726, 438566918, 237133],
             creation: 2,
@@ -648,7 +648,7 @@ mod binary_tests {
 
     #[test]
     fn pid() {
-        let out = to_binary(RawTerm::Pid {
+        let out = to_bytes(RawTerm::Pid {
             node: Box::new(RawTerm::SmallAtom("something@something".to_string())),
             id: 123,
             serial: 654,
@@ -699,7 +699,7 @@ mod binary_tests {
                 ])]),
             ])],
         };
-        let out = to_binary(input);
+        let out = to_bytes(input);
 
         assert_eq!(
             out,

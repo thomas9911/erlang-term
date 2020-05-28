@@ -1,8 +1,11 @@
+use crate::Term;
+use keylist::Keylist;
 use nom::error::ErrorKind;
 use nom::Err as NomErr;
 use num_bigint::BigInt;
+use std::collections::HashMap;
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub enum RawTerm {
     // ATOM_CACHE_REF
     SmallInt(u8),
@@ -60,7 +63,7 @@ pub enum RawTerm {
 }
 
 impl RawTerm {
-    pub fn from_bytes(input: &[u8]) -> Result<Vec<RawTerm>, NomErr<(&[u8], ErrorKind)>> {
+    pub fn try_from_bytes(input: &[u8]) -> Result<RawTerm, NomErr<(&[u8], ErrorKind)>> {
         crate::from_term(input)
     }
 
@@ -154,6 +157,91 @@ impl RawTerm {
     }
 }
 
+impl From<Term> for RawTerm {
+    fn from(term: Term) -> RawTerm {
+        match term {
+            Term::Byte(x) => RawTerm::SmallInt(x),
+            Term::Int(x) => RawTerm::Int(x),
+            Term::Float(x) => RawTerm::Float(x),
+            Term::String(x) => string_to_raw_term(x),
+            Term::Atom(x) => atom_to_raw_term(x),
+            Term::Bytes(x) => RawTerm::Binary(x),
+            Term::Bool(x) => RawTerm::SmallAtom(x.to_string()),
+            Term::Nil => RawTerm::SmallAtom("nil".to_string()),
+            Term::BigInt(x) => big_int_to_raw_term(x),
+            Term::Charlist(x) => RawTerm::String(x),
+            Term::Map(x) => map_to_raw_term(x),
+            Term::Keyword(x) => keyword_to_raw_term(x),
+            Term::List(x) => list_to_raw_term(x),
+            Term::Tuple(x) => tuple_to_raw_term(x),
+            Term::MapArbitrary(x) => map_arbitrary_to_raw_term(x),
+            Term::Other(x) => x,
+        }
+    }
+}
+
+fn string_to_raw_term(string: String) -> RawTerm {
+    RawTerm::Binary(string.as_bytes().to_vec())
+}
+
+fn keyword_to_raw_term(keyword: Keylist<String, Term>) -> RawTerm {
+    let tmp: Vec<RawTerm> = keyword
+        .into_iter()
+        .map(|(a, b)| RawTerm::SmallTuple(vec![string_to_raw_term(a), RawTerm::from(b)]))
+        .collect();
+    RawTerm::List(tmp)
+}
+
+fn map_arbitrary_to_raw_term(map: Keylist<Term, Term>) -> RawTerm {
+    let tmp: Vec<(RawTerm, RawTerm)> = map
+        .into_iter()
+        .map(|(k, v)| (RawTerm::from(k), RawTerm::from(v)))
+        .collect();
+    RawTerm::Map(tmp)
+}
+
+fn map_to_raw_term(map: HashMap<String, Term>) -> RawTerm {
+    let tmp: Vec<(RawTerm, RawTerm)> = map
+        .into_iter()
+        .map(|(k, v)| (string_to_raw_term(k), RawTerm::from(v)))
+        .collect();
+    RawTerm::Map(tmp)
+}
+
+fn list_to_raw_term(list: Vec<Term>) -> RawTerm {
+    if list.is_empty() {
+        RawTerm::Nil
+    } else {
+        RawTerm::List(list.into_iter().map(|x| RawTerm::from(x)).collect())
+    }
+}
+
+fn tuple_to_raw_term(tuple: Vec<Term>) -> RawTerm {
+    let len = tuple.len();
+    let x = tuple.into_iter().map(|x| RawTerm::from(x)).collect();
+    if len < 16 {
+        RawTerm::SmallTuple(x)
+    } else {
+        RawTerm::LargeTuple(x)
+    }
+}
+
+fn big_int_to_raw_term(input: BigInt) -> RawTerm {
+    if input.bits() < (255 * 8) {
+        RawTerm::SmallBigInt(input)
+    } else {
+        RawTerm::LargeBigInt(input)
+    }
+}
+
+fn atom_to_raw_term(input: String) -> RawTerm {
+    if input.len() < 256 {
+        RawTerm::SmallAtom(input)
+    } else {
+        RawTerm::Atom(input)
+    }
+}
+
 #[cfg(test)]
 mod from_term_tests {
     use crate::{from_term, read_binary, RawTerm};
@@ -164,7 +252,7 @@ mod from_term_tests {
         let input = read_binary("bins/small_int.bin").unwrap();
         let out = from_term(&input).unwrap();
 
-        assert_eq!(vec![RawTerm::SmallInt(2)], out);
+        assert_eq!(RawTerm::SmallInt(2), out);
     }
 
     #[test]
@@ -172,7 +260,7 @@ mod from_term_tests {
         let input = read_binary("bins/small_negative_int.bin").unwrap();
         let out = from_term(&input).unwrap();
 
-        assert_eq!(vec![RawTerm::Int(-2)], out);
+        assert_eq!(RawTerm::Int(-2), out);
     }
 
     #[test]
@@ -180,7 +268,7 @@ mod from_term_tests {
         let input = read_binary("bins/int.bin").unwrap();
         let out = from_term(&input).unwrap();
 
-        assert_eq!(vec![RawTerm::Int(1234578)], out);
+        assert_eq!(RawTerm::Int(1234578), out);
     }
 
     #[test]
@@ -188,7 +276,7 @@ mod from_term_tests {
         let input = read_binary("bins/negative_int.bin").unwrap();
         let out = from_term(&input).unwrap();
 
-        assert_eq!(vec![RawTerm::Int(-1234578)], out);
+        assert_eq!(RawTerm::Int(-1234578), out);
     }
 
     #[test]
@@ -196,7 +284,7 @@ mod from_term_tests {
         let input = read_binary("bins/nil.bin").unwrap();
         let out = from_term(&input).unwrap();
 
-        assert_eq!(vec![RawTerm::AtomDeprecated("nil".to_string())], out);
+        assert_eq!(RawTerm::AtomDeprecated("nil".to_string()), out);
     }
 
     #[test]
@@ -204,7 +292,7 @@ mod from_term_tests {
         let input = read_binary("bins/false.bin").unwrap();
         let out = from_term(&input).unwrap();
 
-        assert_eq!(vec![RawTerm::AtomDeprecated("false".to_string())], out);
+        assert_eq!(RawTerm::AtomDeprecated("false".to_string()), out);
     }
 
     #[test]
@@ -212,7 +300,7 @@ mod from_term_tests {
         let input = read_binary("bins/true.bin").unwrap();
         let out = from_term(&input).unwrap();
 
-        assert_eq!(vec![RawTerm::AtomDeprecated("true".to_string())], out);
+        assert_eq!(RawTerm::AtomDeprecated("true".to_string()), out);
     }
 
     #[test]
@@ -220,7 +308,7 @@ mod from_term_tests {
         let input = read_binary("bins/odd_atom.bin").unwrap();
         let out = from_term(&input).unwrap();
 
-        assert_eq!(vec![RawTerm::SmallAtom("oddţ".to_string())], out);
+        assert_eq!(RawTerm::SmallAtom("oddţ".to_string()), out);
     }
 
     #[test]
@@ -229,7 +317,7 @@ mod from_term_tests {
         let out = from_term(&input).unwrap();
 
         assert_eq!(
-            vec![RawTerm::AtomDeprecated("Elixir.TermGenerator".to_string())],
+            RawTerm::AtomDeprecated("Elixir.TermGenerator".to_string()),
             out
         );
     }
@@ -239,7 +327,7 @@ mod from_term_tests {
         let input = read_binary("bins/small_string.bin").unwrap();
         let out = from_term(&input).unwrap();
 
-        assert_eq!(vec![RawTerm::Binary(b"just some text".to_vec())], out);
+        assert_eq!(RawTerm::Binary(b"just some text".to_vec()), out);
     }
 
     #[test]
@@ -247,7 +335,7 @@ mod from_term_tests {
         let input = read_binary("bins/binary.bin").unwrap();
         let out = from_term(&input).unwrap();
 
-        assert_eq!(vec![RawTerm::Binary(vec![1, 2, 3, 4])], out);
+        assert_eq!(RawTerm::Binary(vec![1, 2, 3, 4]), out);
     }
 
     #[test]
@@ -255,7 +343,7 @@ mod from_term_tests {
         let input = read_binary("bins/large_string.bin").unwrap();
         let out = from_term(&input).unwrap();
 
-        if let RawTerm::Binary(x) = &out[0] {
+        if let RawTerm::Binary(x) = &out {
             assert!(x.starts_with(b"Lorem ipsum dolor sit"))
         } else {
             assert!(false)
@@ -267,7 +355,7 @@ mod from_term_tests {
         let input = read_binary("bins/float.bin").unwrap();
         let out = from_term(&input).unwrap();
 
-        assert_eq!(vec![RawTerm::Float(12.515)], out);
+        assert_eq!(RawTerm::Float(12.515), out);
     }
 
     #[test]
@@ -276,7 +364,7 @@ mod from_term_tests {
         let out = from_term(&input).unwrap();
 
         // assert_eq!(vec![RawTerm::List(vec![])], out);
-        assert_eq!(vec![RawTerm::Nil], out);
+        assert_eq!(RawTerm::Nil, out);
     }
 
     #[test]
@@ -284,7 +372,7 @@ mod from_term_tests {
         let input = read_binary("bins/number_list.bin").unwrap();
         let out = from_term(&input).unwrap();
 
-        assert_eq!(vec![RawTerm::String(vec![1, 2, 3, 4])], out);
+        assert_eq!(RawTerm::String(vec![1, 2, 3, 4]), out);
     }
 
     #[test]
@@ -295,12 +383,12 @@ mod from_term_tests {
         let out = from_term(&input).unwrap();
 
         assert_eq!(
-            vec![List(vec![
+            List(vec![
                 SmallInt(1),
                 Binary(b"some".to_vec()),
                 SmallInt(2),
                 Binary(b"text".to_vec())
-            ])],
+            ]),
             out
         );
     }
@@ -313,11 +401,11 @@ mod from_term_tests {
         let out = from_term(&input).unwrap();
 
         assert_eq!(
-            vec![List(vec![
+            List(vec![
                 SmallInt(1),
                 SmallInt(6),
                 Improper(Box::new(SmallInt(2))),
-            ])],
+            ]),
             out
         );
     }
@@ -338,7 +426,7 @@ mod from_term_tests {
             RawTerm::Binary(b"value".to_vec()),
         ));
 
-        assert_eq!(vec![RawTerm::Map(map)], out);
+        assert_eq!(RawTerm::Map(map), out);
     }
 
     #[test]
@@ -346,7 +434,7 @@ mod from_term_tests {
         use RawTerm::*;
 
         let input = read_binary("bins/map.bin").unwrap();
-        if let Map(mut out) = from_term(&input).unwrap().pop().unwrap() {
+        if let Map(mut out) = from_term(&input).unwrap() {
             out.sort_by(|a, b| a.partial_cmp(b).unwrap());
             // let mut map = Vec::new();
 
@@ -412,7 +500,7 @@ mod from_term_tests {
             RawTerm::Int(1234),
         ]));
 
-        assert_eq!(vec![RawTerm::List(map)], out);
+        assert_eq!(RawTerm::List(map), out);
     }
 
     #[test]
@@ -420,10 +508,10 @@ mod from_term_tests {
         let input = read_binary("bins/tuple.bin").unwrap();
         let out = from_term(&input).unwrap();
         assert_eq!(
-            vec![RawTerm::SmallTuple(vec![
+            RawTerm::SmallTuple(vec![
                 RawTerm::Binary(b"test".to_vec()),
                 RawTerm::Binary(b"testing".to_vec())
-            ])],
+            ]),
             out
         );
     }
@@ -433,9 +521,7 @@ mod from_term_tests {
         let input = read_binary("bins/small_big_int.bin").unwrap();
         let out = from_term(&input).unwrap();
         assert_eq!(
-            vec![RawTerm::SmallBigInt(
-                BigInt::parse_bytes(b"123456789123456789123456789", 10).unwrap()
-            )],
+            RawTerm::SmallBigInt(BigInt::parse_bytes(b"123456789123456789123456789", 10).unwrap()),
             out
         );
     }
@@ -449,9 +535,7 @@ mod from_term_tests {
         let nineninenine = BigUint::parse_bytes(b"999", 10).unwrap();
 
         assert_eq!(
-            vec![RawTerm::LargeBigInt(BigInt::from(
-                nineninenine.pow(&nineninenine)
-            ))],
+            RawTerm::LargeBigInt(BigInt::from(nineninenine.pow(&nineninenine))),
             out
         );
     }
@@ -462,12 +546,12 @@ mod from_term_tests {
         let out = from_term(&input).unwrap();
 
         assert_eq!(
-            vec![RawTerm::Pid {
+            RawTerm::Pid {
                 node: Box::new(RawTerm::AtomDeprecated("nonode@nohost".to_string())),
                 id: 91,
                 serial: 0,
                 creation: 0
-            }],
+            },
             out
         );
     }
@@ -478,7 +562,7 @@ mod from_term_tests {
         let out = from_term(&input).unwrap();
 
         assert_eq!(
-            vec![RawTerm::Function {
+            RawTerm::Function {
                 size: 85,
                 arity: 2,
                 uniq: [149, 84, 239, 178, 136, 29, 208, 62, 138, 103, 212, 245, 20, 90, 180, 225],
@@ -493,7 +577,7 @@ mod from_term_tests {
                     creation: 0
                 }),
                 free_var: Vec::new()
-            }],
+            },
             out
         );
     }
@@ -504,11 +588,11 @@ mod from_term_tests {
         let out = from_term(&input).unwrap();
 
         assert_eq!(
-            vec![RawTerm::Port {
+            RawTerm::Port {
                 node: Box::new(RawTerm::AtomDeprecated("nonode@nohost".to_string())),
                 id: 3,
                 creation: 0
-            }],
+            },
             out
         );
     }
@@ -519,11 +603,11 @@ mod from_term_tests {
         let out = from_term(&input).unwrap();
 
         assert_eq!(
-            vec![RawTerm::Ref {
+            RawTerm::Ref {
                 node: Box::new(RawTerm::AtomDeprecated("nonode@nohost".to_string())),
                 id: vec![158726, 438566918, 237133],
                 creation: 0
-            }],
+            },
             out
         );
     }

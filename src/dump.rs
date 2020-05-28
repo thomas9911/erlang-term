@@ -45,8 +45,7 @@ pub fn internal_to_binary(raw: RawTerm, add_prefix: bool) -> Vec<u8> {
         } => function(
             size, arity, uniq, index, *module, *old_index, *old_uniq, *pid, free_var, add_prefix,
         ),
-
-        _ => unreachable!(),
+        Improper(_) => unreachable!(),
     }
 }
 

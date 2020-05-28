@@ -12,11 +12,11 @@ use num_bigint::{BigInt, Sign};
 
 use std::convert::TryInto;
 
-pub fn from_term(input: &[u8]) -> Result<Vec<RawTerm>, NomErr<(&[u8], ErrorKind)>> {
-    let (_, output) = parser(input)?;
+pub fn from_term(input: &[u8]) -> Result<RawTerm, NomErr<(&[u8], ErrorKind)>> {
+    let (_, mut output) = parser(input)?;
     // many0(small_int)(input)
 
-    Ok(output)
+    Ok(output.remove(0))
 }
 
 pub fn parser(input: &[u8]) -> IResult<&[u8], Vec<RawTerm>> {

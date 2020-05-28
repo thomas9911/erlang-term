@@ -2,10 +2,11 @@
 // https://godoc.org/github.com/goerlang/etf#Term
 
 // #[macro_use]
-extern crate multimap;
 extern crate nom;
 extern crate num_bigint;
 extern crate num_traits;
+#[macro_use]
+extern crate serde_derive;
 
 use std::fs::File;
 use std::io::{Read, Result as IoResult};
@@ -14,6 +15,7 @@ pub mod consts;
 pub mod dump;
 pub mod parse;
 pub mod raw_term;
+pub mod serde;
 pub mod term;
 
 pub use dump::to_binary;

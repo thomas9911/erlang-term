@@ -10,13 +10,13 @@ repository = "https://github.com/thomas9911/erlang-term"
 license = "Unlicense"
 
 [dependencies]
-nom = "*"
-num-bigint = "*"
-num-traits = "*"
+nom = "5.1"
+num-bigint = "0.2"
+num-traits = "0.2"
 keylist = "0.1"
-serde = {version = "*", optional = true}
-serde_derive = {version = "*", optional = true}
-serde_json = {version = "*", optional = true}
+serde = {version = "1.0", optional = true}
+serde_derive = {version = "1.0", optional = true}
+serde_json = {version = "1.0", optional = true}
 
 [dev-dependencies]
 

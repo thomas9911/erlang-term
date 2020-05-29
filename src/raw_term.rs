@@ -5,7 +5,8 @@ use nom::Err as NomErr;
 use num_bigint::BigInt;
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
 pub enum RawTerm {
     // ATOM_CACHE_REF
     SmallInt(u8),

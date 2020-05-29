@@ -8,11 +8,14 @@ edition = "2018"
 
 [dependencies]
 nom = "*"
-num-bigint = {version = "*", features = ['serde']}
+num-bigint = "*"
 num-traits = "*"
-serde = "*"
-serde_derive = "*"
-keylist = {version = "0.1", features = ['serde']}
+keylist = "0.1"
+serde = {version = "*", optional = true}
+serde_derive = {version = "*", optional = true}
+serde_json = {version = "*", optional = true}
 
 [dev-dependencies]
-serde_json = "*"
+
+[features]
+serde_impl = ["serde", "serde_derive", "serde_json", "keylist/serde", "num-bigint/serde"]

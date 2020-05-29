@@ -27,17 +27,18 @@ fn main() {
 
 fn print_help(input: &str) -> bool {
     if ["help", "-h", "--help"].contains(&input) {
-
-        println!(r###"
+        println!(
+            r###"
             parse elixir binary to Term
 
             example: 
                 cargo run --example parse "$(elixir -e ":erlang.term_to_binary(%{{ok: 15}}) |> IO.inspect()")"
 
                 cargo run --example parse "<<131, 97, 4>>"
-        "###);
+        "###
+        );
 
-        return true
+        return true;
     }
     false
 }

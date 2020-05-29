@@ -3,8 +3,11 @@ name = "erlang-term"
 version = "0.1.0"
 authors = ["Thomas <thomastimmer11@hotmail.com>"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "Library to convert Erlang External Term Format to Rust objects, without using erlang NIFs."
+keywords = ["erlang", "elixir", "serde"]
+categories = ["encoding", "parser-implementations"]
+repository = "https://github.com/thomas9911/erlang-term"
+license = "Unlicense"
 
 [dependencies]
 nom = "*"

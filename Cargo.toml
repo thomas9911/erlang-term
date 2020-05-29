@@ -1,6 +1,6 @@
 [package]
 name = "erlang-term"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Thomas <thomastimmer11@hotmail.com>"]
 edition = "2018"
 description = "Library to convert Erlang External Term Format to Rust objects, without using erlang NIFs."
@@ -8,6 +8,7 @@ keywords = ["erlang", "elixir", "serde"]
 categories = ["encoding", "parser-implementations"]
 repository = "https://github.com/thomas9911/erlang-term"
 license = "Unlicense"
+readme = "README.md"
 
 [dependencies]
 nom = "5.1"

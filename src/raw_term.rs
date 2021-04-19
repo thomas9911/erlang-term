@@ -324,6 +324,26 @@ mod from_term_tests {
     }
 
     #[test]
+    fn elixir_struct() {
+        let input = read_binary("bins/struct.bin").unwrap();
+        let out = from_bytes(&input).unwrap();
+
+        let expected = RawTerm::Map(vec![
+            (
+                RawTerm::AtomDeprecated("__struct__".to_string()),
+                RawTerm::AtomDeprecated("Elixir.TestStruct".to_string()),
+            ),
+            (
+                RawTerm::AtomDeprecated("a".to_string()),
+                RawTerm::AtomDeprecated("nil".to_string()),
+            ),
+            (RawTerm::AtomDeprecated("b".to_string()), RawTerm::Int(1234)),
+        ]);
+
+        assert_eq!(expected, out);
+    }
+
+    #[test]
     fn small_string() {
         let input = read_binary("bins/small_string.bin").unwrap();
         let out = from_bytes(&input).unwrap();

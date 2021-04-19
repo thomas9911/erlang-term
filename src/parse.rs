@@ -1,6 +1,8 @@
 use crate::consts::*;
 use crate::RawTerm;
 
+#[cfg(zlib)]
+use flate2::Decompress;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take};
 use nom::combinator::all_consuming;
@@ -22,8 +24,9 @@ pub fn parser(input: &[u8]) -> IResult<&[u8], Vec<RawTerm>> {
     all_consuming(preceded(tag(&[REVISION]), many0(term)))(input)
 }
 
+#[cfg(not(zlib))]
 fn term(input: &[u8]) -> IResult<&[u8], RawTerm> {
-    alt((
+    let funcs = (
         small_int,
         int,
         float,
@@ -41,7 +44,55 @@ fn term(input: &[u8]) -> IResult<&[u8], RawTerm> {
         port,
         reference,
         function,
-    ))(input)
+    );
+
+    alt(funcs)(input)
+}
+
+#[cfg(zlib)]
+fn term(input: &[u8]) -> IResult<&[u8], RawTerm> {
+    let funcs = (
+        small_int,
+        int,
+        float,
+        atom_deprecated,
+        small_atom,
+        empty_list,
+        binary,
+        string,
+        list,
+        map,
+        small_tuple,
+        small_big_int,
+        large_big_int,
+        pid,
+        port,
+        reference,
+        function,
+        gzip,
+    );
+
+    alt(funcs)(input)
+}
+
+#[cfg(zlib)]
+fn gzip(input: &[u8]) -> IResult<&[u8], RawTerm> {
+    let (i, t) = preceded(tag(&[ZLIB]), take(4usize))(input)?;
+    let amount = slice_to_u32(t) as usize;
+    let mut decompressor = Decompress::new(true);
+
+    let data = {
+        let mut data = Vec::with_capacity(amount);
+        decompressor
+            .decompress_vec(i, &mut data, flate2::FlushDecompress::None)
+            .map_err(|_| NomErr::Incomplete(nom::Needed::Unknown))?;
+        data
+    };
+
+    // error returns a reference to data owned by this function, which is not allowed
+    // map it to a blank error
+    let (_a, x) = term(&data).map_err(|_| NomErr::Incomplete(nom::Needed::Unknown))?;
+    Ok((&[], x))
 }
 
 fn small_atom(input: &[u8]) -> IResult<&[u8], RawTerm> {

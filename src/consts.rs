@@ -28,3 +28,5 @@ pub const SMALL_ATOM_UTF8_EXT: u8 = 119;
 // pub const REFERENCE_EXT (deprecated) : u8= 101;
 pub const ATOM_EXT_DEPRECATED: u8 = 100;
 pub const SMALL_ATOM_EXT_DEPRECATED: u8 = 115;
+
+pub const ZLIB: u8 = 80;

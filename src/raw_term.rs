@@ -116,6 +116,14 @@ impl RawTerm {
         }
     }
 
+    pub fn is_list(&self) -> bool {
+        use RawTerm::*;
+        match self {
+            List(_) => true,
+            _ => false,
+        }
+    }
+
     pub fn as_atom(self) -> Option<String> {
         use RawTerm::*;
         match self {
@@ -631,5 +639,13 @@ mod from_term_tests {
             },
             out
         );
+    }
+
+    #[test]
+    #[cfg(zlib)]
+    fn gzip() {
+        let input = read_binary("bins/number_list_gzip.bin").unwrap();
+        let out = from_bytes(&input).unwrap();
+        assert!(out.is_list());
     }
 }

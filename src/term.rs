@@ -1,7 +1,7 @@
 use crate::RawTerm;
 
 use keylist::Keylist;
-use nom::error::ErrorKind;
+use nom::error::Error;
 use nom::Err as NomErr;
 use num_bigint::BigInt;
 use std::collections::HashMap;
@@ -21,7 +21,6 @@ pub enum Term {
     Nil,
     BigInt(BigInt),
     Charlist(Vec<u8>),
-    // Keyword(Vec<(String, Term)>),
     Map(HashMap<String, Term>),
     Keyword(Keylist<String, Term>),
     List(Vec<Term>),
@@ -100,7 +99,7 @@ fn atom_to_term(atom: String) -> Term {
     }
 }
 impl Term {
-    pub fn from_bytes(input: &[u8]) -> Result<Term, NomErr<(&[u8], ErrorKind)>> {
+    pub fn from_bytes(input: &[u8]) -> Result<Term, NomErr<Error<&[u8]>>> {
         Ok(Term::from(RawTerm::from_bytes(input)?))
     }
 

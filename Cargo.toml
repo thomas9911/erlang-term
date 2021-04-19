@@ -1,6 +1,6 @@
 [package]
 name = "erlang-term"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Thomas <thomastimmer11@hotmail.com>"]
 edition = "2018"
 description = "Library to convert Erlang External Term Format to Rust objects, without using erlang NIFs."
@@ -11,10 +11,10 @@ license = "Unlicense"
 readme = "README.md"
 
 [dependencies]
-nom = "5.1"
-num-bigint = "0.2"
+nom = "6.1"
+num-bigint = "0.4"
 num-traits = "0.2"
-keylist = "0.1"
+keylist = "0.2"
 serde = {version = "1.0", optional = true}
 serde_derive = {version = "1.0", optional = true}
 serde_json = {version = "1.0", optional = true}

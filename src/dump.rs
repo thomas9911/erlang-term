@@ -486,7 +486,7 @@ mod binary_tests {
         let expected = read_binary("bins/large_big_int.bin").unwrap();
         let nineninenine = BigUint::parse_bytes(b"999", 10).unwrap();
         let out = to_bytes(RawTerm::LargeBigInt(BigInt::from(
-            nineninenine.pow(&nineninenine),
+            nineninenine.clone().pow(&nineninenine),
         )));
 
         assert_eq!(expected, out);

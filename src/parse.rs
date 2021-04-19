@@ -4,7 +4,7 @@ use crate::RawTerm;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take};
 use nom::combinator::all_consuming;
-use nom::error::ErrorKind;
+use nom::error::Error;
 use nom::multi::{many0, many_m_n};
 use nom::sequence::{preceded, tuple};
 use nom::{Err as NomErr, IResult};
@@ -12,16 +12,13 @@ use num_bigint::{BigInt, Sign};
 
 use std::convert::TryInto;
 
-pub fn from_bytes(input: &[u8]) -> Result<RawTerm, NomErr<(&[u8], ErrorKind)>> {
+pub fn from_bytes(input: &[u8]) -> Result<RawTerm, NomErr<Error<&[u8]>>> {
     let (_, mut output) = parser(input)?;
-    // many0(small_int)(input)
 
     Ok(output.remove(0))
 }
 
 pub fn parser(input: &[u8]) -> IResult<&[u8], Vec<RawTerm>> {
-    // pub fn parser(input: &[u8]) -> Result<Vec<RawTerm>, NomErr<(&[u8], ErrorKind)>> {
-    // pub fn parser(input: &[u8]) -> Result<Vec<RawTerm>, &[u8]> {
     all_consuming(preceded(tag(&[REVISION]), many0(term)))(input)
 }
 
@@ -60,17 +57,7 @@ fn small_atom(input: &[u8]) -> IResult<&[u8], RawTerm> {
 fn small_tuple(input: &[u8]) -> IResult<&[u8], RawTerm> {
     let (i, t) = preceded(tag(&[SMALL_TUPLE_EXT]), take(1usize))(input)?;
     let length = t[0] as usize;
-
     let (i, t) = many_m_n(length, length, term)(i)?;
-
-    // if t.len() == 2 {
-    //     Ok((
-    //         i,
-    //         RawTerm::Pair(Box::new(t[0].clone()), Box::new(t[1].clone())),
-    //     ))
-    // } else {
-    //     Ok((i, RawTerm::Tuple(t)))
-    // }
     Ok((i, RawTerm::SmallTuple(t)))
 }
 fn atom_deprecated(input: &[u8]) -> IResult<&[u8], RawTerm> {
@@ -169,7 +156,6 @@ fn function(input: &[u8]) -> IResult<&[u8], RawTerm> {
         preceded(tag(&[NEW_FUN_EXT]), get_data)(input)?;
     let size = slice_to_u32(size);
     let arity = slice_to_u8(arity);
-    // let uniq = slice_to_u128(uniq);
     let index = slice_to_u32(index);
     let num_free = slice_to_u32(num_free) as usize;
     let uniq: [u8; 16] = uniq.try_into().unwrap();
@@ -200,21 +186,10 @@ fn list(input: &[u8]) -> IResult<&[u8], RawTerm> {
     if let Some(x) = t.pop() {
         match x {
             RawTerm::Nil => (),
-            // RawTerm::List(y) => {
-            //     if !y.is_empty() {
-            //         t.push(RawTerm::Improper(Box::new(RawTerm::List(y))))
-            //     }
-            // }
             y => t.push(RawTerm::Improper(Box::new(y))),
         }
     }
 
-    // if t.iter().all(|x| x.is_atom_pair()) {
-    //     let list = HashMap::from_iter(t.iter().map(|x| x.as_atom_pair().unwrap()));
-    //     Ok((i, RawTerm::Keyword(list)))
-    // } else {
-    //     Ok((i, RawTerm::List(t)))
-    // }
     Ok((i, RawTerm::List(t)))
 }
 
@@ -255,10 +230,8 @@ fn float(input: &[u8]) -> IResult<&[u8], RawTerm> {
 }
 
 fn empty_list(input: &[u8]) -> IResult<&[u8], RawTerm> {
-    // alt((alpha1, digit1))(input)
     let (i, _) = tag(&[NIL_EXT])(input)?;
 
-    // Ok((i, RawTerm::List(vec![])))
     Ok((i, RawTerm::Nil))
 }
 
@@ -270,23 +243,11 @@ fn map(input: &[u8]) -> IResult<&[u8], RawTerm> {
 
     let mut keyword: Vec<(RawTerm, RawTerm)> = Vec::new();
 
-    // t.chunks(2).map(|[k, v]| (k.clone(), v.clone())).collect();
-    // let mut all_strings = true;
     for ch in t.chunks(2) {
         // all_strings = all_strings && ch[0].is_string_like();
         keyword.push((ch[0].clone(), ch[1].clone()));
     }
 
-    // if all_strings {
-    //     let map = HashMap::from_iter(
-    //         keyword
-    //             .into_iter()
-    //             .map(|(k, v)| (k.as_string().unwrap(), v)),
-    //     );
-    //     Ok((i, RawTerm::Map(map)))
-    // } else {
-    //     Ok((i, RawTerm::MapArbitrary(keyword)))
-    // }
     Ok((i, RawTerm::Map(keyword)))
 }
 
@@ -318,11 +279,6 @@ fn large_big_int(input: &[u8]) -> IResult<&[u8], RawTerm> {
 
     Ok((i, RawTerm::LargeBigInt(BigInt::from_bytes_le(sign, t))))
 }
-
-// fn slice_to_u128(input: &[u8]) -> u128 {
-//     let new_int: [u8; 16] = input.try_into().unwrap();
-//     u128::from_be_bytes(new_int)
-// }
 
 fn slice_to_i32(input: &[u8]) -> i32 {
     let new_int: [u8; 4] = input.try_into().unwrap();

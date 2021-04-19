@@ -1,6 +1,6 @@
 use crate::Term;
 use keylist::Keylist;
-use nom::error::ErrorKind;
+use nom::error::Error;
 use nom::Err as NomErr;
 use num_bigint::BigInt;
 use std::collections::HashMap;
@@ -64,7 +64,7 @@ pub enum RawTerm {
 }
 
 impl RawTerm {
-    pub fn from_bytes(input: &[u8]) -> Result<RawTerm, NomErr<(&[u8], ErrorKind)>> {
+    pub fn from_bytes(input: &[u8]) -> Result<RawTerm, NomErr<Error<&[u8]>>> {
         crate::from_bytes(input)
     }
 
@@ -536,7 +536,7 @@ mod from_term_tests {
         let nineninenine = BigUint::parse_bytes(b"999", 10).unwrap();
 
         assert_eq!(
-            RawTerm::LargeBigInt(BigInt::from(nineninenine.pow(&nineninenine))),
+            RawTerm::LargeBigInt(BigInt::from(nineninenine.clone().pow(&nineninenine))),
             out
         );
     }

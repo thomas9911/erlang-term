@@ -1,7 +1,7 @@
 use crate::consts::*;
 use crate::RawTerm;
 
-#[cfg(zlib)]
+#[cfg(feature = "zlib")]
 use flate2::Decompress;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take};
@@ -24,7 +24,7 @@ pub fn parser(input: &[u8]) -> IResult<&[u8], Vec<RawTerm>> {
     all_consuming(preceded(tag(&[REVISION]), many0(term)))(input)
 }
 
-#[cfg(not(zlib))]
+#[cfg(not(feature = "zlib"))]
 fn term(input: &[u8]) -> IResult<&[u8], RawTerm> {
     let funcs = (
         small_int,
@@ -49,7 +49,7 @@ fn term(input: &[u8]) -> IResult<&[u8], RawTerm> {
     alt(funcs)(input)
 }
 
-#[cfg(zlib)]
+#[cfg(feature = "zlib")]
 fn term(input: &[u8]) -> IResult<&[u8], RawTerm> {
     let funcs = (
         small_int,
@@ -75,7 +75,7 @@ fn term(input: &[u8]) -> IResult<&[u8], RawTerm> {
     alt(funcs)(input)
 }
 
-#[cfg(zlib)]
+#[cfg(feature = "zlib")]
 fn gzip(input: &[u8]) -> IResult<&[u8], RawTerm> {
     let (i, t) = preceded(tag(&[ZLIB]), take(4usize))(input)?;
     let amount = slice_to_u32(t) as usize;

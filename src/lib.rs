@@ -75,6 +75,8 @@ pub mod raw_term;
 pub mod term;
 
 pub use dump::to_bytes;
+#[cfg(feature = "zlib")]
+pub use dump::to_gzip_bytes;
 pub use parse::from_bytes;
 pub use raw_term::RawTerm;
 pub use term::Term;

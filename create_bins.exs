@@ -45,7 +45,7 @@ defmodule TermGenerator do
         # Port.close(port)
 
         # save(make_ref(), "ref")
-
+        save_gzip(Enum.to_list(0..1000), "number_list_gzip")
     end
 
     def save(object, name) do
@@ -54,6 +54,14 @@ defmodule TermGenerator do
 
     def save_to_disk(object, path) do
         File.write!(path, :erlang.term_to_binary(object))
+    end
+
+    def save_gzip(object, name) do
+        save_to_disk_gzip(object, "#{@base_path}/#{name}.bin")
+    end
+
+    def save_to_disk_gzip(object, path) do
+        File.write!(path, :erlang.term_to_binary(object, compressed: 6) |> IO.inspect)
     end
 
     def save_large_string(path) do

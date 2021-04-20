@@ -1,8 +1,30 @@
 use crate::consts::*;
 use crate::RawTerm;
 use num_bigint::{BigInt, Sign};
+
+#[cfg(feature = "zlib")]
+use flate2::read::ZlibEncoder;
+#[cfg(feature = "zlib")]
+use flate2::Compression;
+#[cfg(feature = "zlib")]
+use std::io::prelude::*;
+
 pub fn to_bytes(raw: RawTerm) -> Vec<u8> {
     internal_to_binary(raw, true)
+}
+
+#[cfg(feature = "zlib")]
+pub fn to_gzip_bytes(raw: RawTerm, level: Compression) -> std::io::Result<Vec<u8>> {
+
+    let bytes = internal_to_binary(raw, false);
+    let mut buffer = Vec::with_capacity(bytes.len());
+    let mut encoder = ZlibEncoder::new(&bytes[..], level);
+    push_prefix(&mut buffer);
+    buffer.push(ZLIB);
+    let length = bytes.len() as u32;
+    buffer.extend_from_slice(&length.to_be_bytes());
+    encoder.read_to_end(&mut buffer)?;
+    Ok(buffer)
 }
 
 pub fn internal_to_binary(raw: RawTerm, add_prefix: bool) -> Vec<u8> {
@@ -713,5 +735,36 @@ mod binary_tests {
                 100, 0, 4, 97, 116, 111, 109, 97, 0, 100, 0, 3, 110, 105, 108, 106, 106
             ]
         )
+    }
+
+    #[test]
+    #[cfg(feature = "zlib")]
+    fn gzip_bytes() {
+        use crate::to_gzip_bytes;
+        use flate2::Compression;
+
+        let list = RawTerm::List((0..100).into_iter().map(RawTerm::Int).collect());
+
+        // validated in elixir
+        // ```elixir
+        // expected |> :erlang.list_to_binary() |> :erlang.binary_to_term()
+        // ```
+
+        let expected = vec![
+            131, 80, 0, 0, 1, 250, 120, 156, 21, 196, 51, 150, 67, 1, 0, 0, 192, 191, 182, 109,
+            219, 182, 109, 198, 70, 149, 151, 251, 215, 201, 52, 83, 14, 130, 160, 152, 175, 18,
+            160, 6, 181, 168, 67, 61, 26, 208, 136, 38, 52, 163, 5, 173, 104, 67, 59, 58, 208, 137,
+            46, 116, 163, 7, 189, 232, 67, 63, 6, 48, 136, 33, 12, 99, 4, 163, 24, 195, 56, 38, 48,
+            137, 41, 76, 99, 6, 179, 152, 195, 60, 22, 176, 136, 37, 44, 99, 5, 171, 88, 195, 58,
+            54, 176, 137, 45, 108, 99, 7, 187, 216, 195, 62, 14, 112, 136, 35, 28, 227, 4, 167, 56,
+            195, 57, 46, 112, 137, 43, 92, 227, 6, 183, 184, 195, 61, 30, 240, 136, 39, 60, 227, 5,
+            175, 120, 195, 59, 62, 240, 137, 47, 124, 227, 7, 191, 248, 195, 63, 66, 8, 35, 130,
+            40, 98, 136, 35, 129, 36, 82, 72, 35, 131, 44, 114, 200, 163, 80, 170, 0, 4, 44, 58,
+            217,
+        ];
+
+        let output = to_gzip_bytes(list, Compression::new(6)).unwrap();
+
+        assert_eq!(expected, output);
     }
 }

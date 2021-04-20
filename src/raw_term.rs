@@ -72,6 +72,11 @@ impl RawTerm {
         crate::to_bytes(self)
     }
 
+    #[cfg(feature = "zlib")]
+    pub fn to_gzip_bytes(self, level: flate2::Compression) -> std::io::Result<Vec<u8>> {
+        crate::to_gzip_bytes(self, level)
+    }
+
     pub fn is_atom(&self) -> bool {
         use RawTerm::*;
         match self {
@@ -642,7 +647,7 @@ mod from_term_tests {
     }
 
     #[test]
-    #[cfg(zlib)]
+    #[cfg(feature = "zlib")]
     fn gzip() {
         let input = read_binary("bins/number_list_gzip.bin").unwrap();
         let out = from_bytes(&input).unwrap();

@@ -15,7 +15,6 @@ pub fn to_bytes(raw: RawTerm) -> Vec<u8> {
 
 #[cfg(feature = "zlib")]
 pub fn to_gzip_bytes(raw: RawTerm, level: Compression) -> std::io::Result<Vec<u8>> {
-
     let bytes = internal_to_binary(raw, false);
     let mut buffer = Vec::with_capacity(bytes.len());
     let mut encoder = ZlibEncoder::new(&bytes[..], level);

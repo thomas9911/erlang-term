@@ -98,6 +98,102 @@ fn atom_to_term(atom: String) -> Term {
         _ => Term::Atom(atom),
     }
 }
+
+impl std::fmt::Display for Term {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", print_elixir_term(self))
+    }
+}
+
+pub fn print_elixir_term(term: &Term) -> String {
+    use Term::*;
+
+    match term {
+        Bool(b) => b.to_string(),
+        Nil => "nil".to_string(),
+        String(s) => format!("{:?}", s),
+        Atom(a) => format_atom(a),
+        Byte(b) => b.to_string(),
+        Bytes(b) => {
+            let bytes: Vec<_> = b.iter().map(|x| x.to_string()).collect();
+            let mut inner = bytes.join(", ");
+            inner.insert_str(0, "<<");
+            inner.push_str(">>");
+            inner
+        }
+        Charlist(c) => {
+            format!("{:?}", c)
+        }
+        Int(i) => i.to_string(),
+        Float(f) => f.to_string(),
+        BigInt(b) => b.to_string(),
+        Keyword(k) => {
+            let list: Vec<_> = k
+                .iter()
+                .map(|(k, v)| {
+                    let mut a = format_atom(k);
+                    a = a.trim_start_matches(':').to_string();
+                    format!("{}: {}", a, print_elixir_term(v))
+                })
+                .collect();
+            let mut inner = list.join(", ");
+            inner.insert(0, '[');
+            inner.push(']');
+            inner
+        }
+        List(l) => {
+            let list: Vec<_> = l.iter().map(print_elixir_term).collect();
+            let mut inner = list.join(", ");
+            inner.insert(0, '[');
+            inner.push(']');
+            inner
+        }
+        Tuple(t) => {
+            let list: Vec<_> = t.iter().map(print_elixir_term).collect();
+            let mut inner = list.join(", ");
+            inner.insert(0, '{');
+            inner.push('}');
+            inner
+        }
+        Map(m) => {
+            let list: Vec<_> = m
+                .iter()
+                .map(|(k, v)| format!("{:?} => {}", k, print_elixir_term(v)))
+                .collect();
+            let mut inner = list.join(", ");
+            inner.insert_str(0, "%{");
+            inner.push('}');
+            inner
+        }
+        MapArbitrary(m) => {
+            let list: Vec<_> = m
+                .iter()
+                .map(|(k, v)| format!("{} => {}", print_elixir_term(k), print_elixir_term(v)))
+                .collect();
+            let mut inner = list.join(", ");
+            inner.insert_str(0, "%{");
+            inner.push('}');
+            inner
+        }
+        other => format!("#{:?}", other),
+    }
+}
+
+fn format_atom(a: &str) -> String {
+    if a.is_empty() {
+        return String::from(r#":"""#);
+    }
+    if a.chars().all(|x| x.is_ascii_alphanumeric()) {
+        if a.chars().next().unwrap().is_ascii_uppercase() {
+            return format!("{}", a);
+        }
+        if !a.chars().next().unwrap().is_ascii_digit() {
+            return format!(":{}", a);
+        }
+    }
+    format!(r#":"{}""#, a)
+}
+
 impl Term {
     pub fn from_bytes(input: &[u8]) -> Result<Term, NomErr<Error<&[u8]>>> {
         Ok(Term::from(RawTerm::from_bytes(input)?))
@@ -105,6 +201,11 @@ impl Term {
 
     pub fn to_bytes(self) -> Vec<u8> {
         RawTerm::from(self).to_bytes()
+    }
+
+    #[cfg(feature = "zlib")]
+    pub fn to_gzip_bytes(self, level: flate2::Compression) -> std::io::Result<Vec<u8>> {
+        RawTerm::from(self).to_gzip_bytes(level)
     }
 
     pub fn is_byte(&self) -> bool {
@@ -602,6 +703,119 @@ mod from_tests {
                 (String::from("5"), "testing".into())
             ])),
             map.into()
+        );
+    }
+}
+
+#[cfg(test)]
+mod print {
+    use super::print_elixir_term;
+    use crate::{RawTerm, Term};
+    use keylist::Keylist;
+    use num_bigint::BigInt;
+    use std::collections::HashMap;
+    use std::iter::FromIterator;
+
+    #[test]
+    fn display() {
+        let keylist: Keylist<String, Term> = Keylist::from_iter(vec![
+            ("test".into(), 1.into()),
+            ("Test".into(), 2.into()),
+            ("1234Test".into(), 3.into()),
+        ]);
+        assert_eq!(
+            r#"[test: 1, Test: 2, "1234Test": 3]"#,
+            Term::Keyword(keylist).to_string()
+        );
+    }
+
+    #[test]
+    fn elixir_term() {
+        assert_eq!(
+            "\"testing\"",
+            print_elixir_term(&Term::String(String::from("testing")))
+        );
+        assert_eq!("123", print_elixir_term(&Term::Byte(123)));
+        assert_eq!("nil", print_elixir_term(&Term::Nil));
+        assert_eq!(
+            ":testing",
+            print_elixir_term(&Term::Atom(String::from("testing")))
+        );
+        assert_eq!(
+            "NiceModule",
+            print_elixir_term(&Term::Atom(String::from("NiceModule")))
+        );
+        assert_eq!(
+            ":\":D:D\"",
+            print_elixir_term(&Term::Atom(String::from(":D:D")))
+        );
+        assert_eq!(
+            ":\"1234testing\"",
+            print_elixir_term(&Term::Atom(String::from("1234testing")))
+        );
+        assert_eq!(
+            "<<1, 2, 3, 4, 5, 6, 7>>",
+            print_elixir_term(&Term::Bytes(vec![1, 2, 3, 4, 5, 6, 7]))
+        );
+        assert_eq!(
+            "[1, 2, 3, 4, 5, 6, 7]",
+            print_elixir_term(&Term::Charlist(vec![1, 2, 3, 4, 5, 6, 7]))
+        );
+        assert_eq!("3.123124123123123", print_elixir_term(&Term::Float(3.12312412312312323546888848456546565516164651884446584621651658468222541315465468542651)));
+        assert_eq!("123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789", print_elixir_term(&Term::BigInt(BigInt::parse_bytes(b"123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789", 10).unwrap())));
+        let keylist: Keylist<String, Term> = Keylist::from_iter(vec![
+            ("test".into(), 1.into()),
+            ("Test".into(), 2.into()),
+            ("1234Test".into(), 3.into()),
+        ]);
+        assert_eq!(
+            r#"[test: 1, Test: 2, "1234Test": 3]"#,
+            print_elixir_term(&Term::Keyword(keylist))
+        );
+        let list = vec![
+            "hallo".into(),
+            Term::Byte(123),
+            Term::Nil,
+            Term::Bytes(vec![1, 2, 3, 4, 5, 6, 7]),
+        ];
+        assert_eq!(
+            r#"["hallo", 123, nil, <<1, 2, 3, 4, 5, 6, 7>>]"#,
+            print_elixir_term(&Term::List(list))
+        );
+        let list = vec![
+            "hallo".into(),
+            Term::Byte(123),
+            Term::Nil,
+            Term::Bytes(vec![1, 2, 3, 4, 5, 6, 7]),
+        ];
+        assert_eq!(
+            r#"{"hallo", 123, nil, <<1, 2, 3, 4, 5, 6, 7>>}"#,
+            print_elixir_term(&Term::Tuple(list))
+        );
+        let map: HashMap<String, Term> = HashMap::from_iter(vec![
+            ("test".into(), 1.into()),
+            ("Test".into(), 2.into()),
+            ("1234Test".into(), 3.into()),
+            ("testing testing".into(), 4.into()),
+        ]);
+        let map_text = print_elixir_term(&Term::Map(map));
+        assert!(map_text.contains("Test"));
+        assert!(map_text.contains("%{"));
+        assert!(map_text.contains(r#""1234Test" => 3"#));
+
+        let map = Keylist::from(vec![
+            (Term::List(vec!["test".into()]), 12.into()),
+            (Term::List(vec!["testing".into()]), 129.into()),
+        ]);
+
+        let map_text = print_elixir_term(&Term::MapArbitrary(map));
+        assert!(map_text.contains(r#"["test"] => 12"#));
+        assert!(map_text.contains(r#"["testing"] => 129"#));
+        assert!(map_text.contains("%{"));
+
+        assert_eq!(
+            "#Other(Int(-123))",
+            print_elixir_term(&Term::Other(RawTerm::Int(-123)))
         );
     }
 }

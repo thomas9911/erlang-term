@@ -38,6 +38,7 @@ fn term(input: &[u8]) -> IResult<&[u8], RawTerm> {
         list,
         map,
         small_tuple,
+        large_tuple,
         small_big_int,
         large_big_int,
         pid,
@@ -63,6 +64,7 @@ fn term(input: &[u8]) -> IResult<&[u8], RawTerm> {
         list,
         map,
         small_tuple,
+        large_tuple,
         small_big_int,
         large_big_int,
         pid,
@@ -110,6 +112,12 @@ fn small_tuple(input: &[u8]) -> IResult<&[u8], RawTerm> {
     let length = t[0] as usize;
     let (i, t) = many_m_n(length, length, term)(i)?;
     Ok((i, RawTerm::SmallTuple(t)))
+}
+fn large_tuple(input: &[u8]) -> IResult<&[u8], RawTerm> {
+    let (i, t) = preceded(tag(&[LARGE_TUPLE_EXT]), take(4usize))(input)?;
+    let length = slice_to_u32(t) as usize;
+    let (i, t) = many_m_n(length, length, term)(i)?;
+    Ok((i, RawTerm::LargeTuple(t)))
 }
 fn atom_deprecated(input: &[u8]) -> IResult<&[u8], RawTerm> {
     let (i, t) = preceded(tag(&[ATOM_EXT_DEPRECATED]), take(2usize))(input)?;

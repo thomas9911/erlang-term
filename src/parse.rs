@@ -81,6 +81,7 @@ fn term(input: &[u8]) -> IResult<&[u8], RawTerm> {
         PORT_EXT => (port),
         NEW_REFERENCE_EXT => (reference),
         NEW_FUN_EXT => (function),
+        ZLIB => (gzip),
         _ => {
             return Err(Err::Error(nom::error::Error::new(input, ErrorKind::NoneOf)));
         }

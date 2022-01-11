@@ -1,5 +1,6 @@
 use crate::consts::*;
 use crate::RawTerm;
+use nom::Err;
 
 #[cfg(feature = "zlib")]
 use flate2::Decompress;
@@ -7,6 +8,7 @@ use nom::branch::alt;
 use nom::bytes::complete::{tag, take};
 use nom::combinator::all_consuming;
 use nom::error::Error;
+use nom::error::ErrorKind;
 use nom::multi::{many0, many_m_n};
 use nom::sequence::{preceded, tuple};
 use nom::{Err as NomErr, IResult};
@@ -26,55 +28,65 @@ pub fn parser(input: &[u8]) -> IResult<&[u8], Vec<RawTerm>> {
 
 #[cfg(not(feature = "zlib"))]
 fn term(input: &[u8]) -> IResult<&[u8], RawTerm> {
-    let funcs = (
-        small_int,
-        int,
-        float,
-        atom_deprecated,
-        small_atom,
-        empty_list,
-        binary,
-        string,
-        list,
-        map,
-        small_tuple,
-        large_tuple,
-        small_big_int,
-        large_big_int,
-        pid,
-        port,
-        reference,
-        function,
-    );
-
-    alt(funcs)(input)
+    if input.is_empty() {
+        return Err(Err::Error(nom::error::Error::new(input, ErrorKind::Eof)));
+    }
+    let funcs = match input[0] {
+        SMALL_INTEGER_EXT => (small_int),
+        INTEGER_EXT => (int),
+        NEW_FLOAT_EXT => (float),
+        ATOM_EXT_DEPRECATED => (atom_deprecated),
+        SMALL_ATOM_UTF8_EXT => (small_atom),
+        NIL_EXT => (empty_list),
+        BINARY_EXT => (binary),
+        STRING_EXT => (string),
+        LIST_EXT => (list),
+        MAP_EXT => (map),
+        SMALL_TUPLE_EXT => (small_tuple),
+        LARGE_TUPLE_EXT => (large_tuple),
+        SMALL_BIG_EXT => (small_big_int),
+        LARGE_BIG_EXT => (large_big_int),
+        PID_EXT => (pid),
+        PORT_EXT => (port),
+        NEW_REFERENCE_EXT => (reference),
+        NEW_FUN_EXT => (function),
+        _ => {
+            return Err(Err::Error(nom::error::Error::new(input, ErrorKind::NoneOf)));
+        }
+    };
+    funcs(input)
 }
 
 #[cfg(feature = "zlib")]
 fn term(input: &[u8]) -> IResult<&[u8], RawTerm> {
-    let funcs = (
-        small_int,
-        int,
-        float,
-        atom_deprecated,
-        small_atom,
-        empty_list,
-        binary,
-        string,
-        list,
-        map,
-        small_tuple,
-        large_tuple,
-        small_big_int,
-        large_big_int,
-        pid,
-        port,
-        reference,
-        function,
-        gzip,
-    );
-
-    alt(funcs)(input)
+    if input.is_empty() {
+        return Err(Err::Error(nom::error::Error::new(input, ErrorKind::Eof)));
+    }
+    let funcs = match input[0] {
+        SMALL_INTEGER_EXT => (small_int),
+        INTEGER_EXT => (int),
+        NEW_FLOAT_EXT => (float),
+        ATOM_EXT_DEPRECATED => (atom_deprecated),
+        SMALL_ATOM_UTF8_EXT => (small_atom),
+        NIL_EXT => (empty_list),
+        BINARY_EXT => (binary),
+        STRING_EXT => (string),
+        LIST_EXT => (list),
+        MAP_EXT => (map),
+        SMALL_TUPLE_EXT => (small_tuple),
+        LARGE_TUPLE_EXT => (large_tuple),
+        SMALL_BIG_EXT => (small_big_int),
+        LARGE_BIG_EXT => (large_big_int),
+        PID_EXT => (pid),
+        PORT_EXT => (port),
+        NEW_REFERENCE_EXT => (reference),
+        NEW_FUN_EXT => (function),
+        ZLIB => (gzip),
+        _ => {
+            return Err(Err::Error(nom::error::Error::new(input, ErrorKind::NoneOf)));
+        }
+    };
+    funcs(input)
 }
 
 #[cfg(feature = "zlib")]

@@ -20,7 +20,12 @@ serde = {version = "1.0", optional = true}
 serde_derive = {version = "1.0", optional = true}
 serde_json = {version = "1.0", optional = true}
 
+[[bench]]
+name = "bench"
+harness = false
+
 [dev-dependencies]
+bencher = "0.1.5"
 
 [features]
 serde_impl = ["serde", "serde_derive", "serde_json", "keylist/serde", "num-bigint/serde"]

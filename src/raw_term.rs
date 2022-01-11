@@ -551,23 +551,20 @@ mod from_term_tests {
         let large_tuple = read_binary("bins/large_tuple.bin").unwrap();
         let out = from_bytes(&large_tuple).unwrap();
         let mut tuple = vec![];
-        for i in 1..401{
-            if i < 256{
-            tuple.push(RawTerm::SmallInt(i as u8));
-            }else{
-            tuple.push(RawTerm::Int(i));
+        for i in 1..401 {
+            if i < 256 {
+                tuple.push(RawTerm::SmallInt(i as u8));
+            } else {
+                tuple.push(RawTerm::Int(i));
             }
         }
         let tuple = RawTerm::SmallTuple(vec![
-                RawTerm::AtomDeprecated("row_data".into()),
-                RawTerm::Binary(b"kkk".to_vec()),
-                RawTerm::LargeTuple(tuple),
-                RawTerm::SmallInt(10)
-            ]);
-        assert_eq!(
-           tuple,
-            out
-        );
+            RawTerm::AtomDeprecated("row_data".into()),
+            RawTerm::Binary(b"kkk".to_vec()),
+            RawTerm::LargeTuple(tuple),
+            RawTerm::SmallInt(10),
+        ]);
+        assert_eq!(tuple, out);
         let bin = tuple.to_bytes();
         assert_eq!(bin, large_tuple);
     }

@@ -11,7 +11,7 @@ license = "Unlicense"
 readme = "README.md"
 
 [dependencies]
-nom = "6.1"
+nom = "7.1"
 num-bigint = "0.4"
 num-traits = "0.2"
 keylist = "0.2"

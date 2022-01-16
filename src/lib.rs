@@ -72,6 +72,8 @@ pub mod consts;
 pub mod dump;
 pub mod parse;
 pub mod raw_term;
+#[cfg(feature = "rustler")]
+pub mod rustler;
 pub mod term;
 
 pub use dump::to_bytes;

@@ -30,6 +30,12 @@ pub enum RawTerm {
         serial: u32,
         creation: u8,
     },
+    NewPid {
+        node: Box<RawTerm>,
+        id: u32,
+        serial: u32,
+        creation: u32,
+    },
     Port {
         node: Box<RawTerm>,
         id: u32,
@@ -608,7 +614,22 @@ mod from_term_tests {
             out
         );
     }
-
+    #[test]
+    fn new_pid(){
+        let input = read_binary("bins/new_pid.bin").unwrap();
+        let out = from_bytes(&input).unwrap();
+        let expect = RawTerm::NewPid {
+                node: Box::new(RawTerm::AtomDeprecated("nonode@nohost".to_string())),
+                id: 79,
+                serial: 0,
+                creation: 0
+            };
+        assert_eq!(
+            expect,
+            out
+        );
+        assert_eq!(&input, &expect.to_bytes());
+    }
     #[test]
     fn function() {
         let input = read_binary("bins/function.bin").unwrap();

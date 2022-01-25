@@ -615,19 +615,16 @@ mod from_term_tests {
         );
     }
     #[test]
-    fn new_pid(){
+    fn new_pid() {
         let input = read_binary("bins/new_pid.bin").unwrap();
         let out = from_bytes(&input).unwrap();
         let expect = RawTerm::NewPid {
-                node: Box::new(RawTerm::AtomDeprecated("nonode@nohost".to_string())),
-                id: 79,
-                serial: 0,
-                creation: 0
-            };
-        assert_eq!(
-            expect,
-            out
-        );
+            node: Box::new(RawTerm::AtomDeprecated("nonode@nohost".to_string())),
+            id: 79,
+            serial: 0,
+            creation: 0,
+        };
+        assert_eq!(expect, out);
         assert_eq!(&input, &expect.to_bytes());
     }
     #[test]
@@ -654,6 +651,36 @@ mod from_term_tests {
             },
             out
         );
+        // function included new_pid
+        // #Fun<big_data_redis_SUITE.0.96608257>
+        let input = &[
+            131, 112, 0, 0, 0, 88, 0, 184, 68, 0, 56, 201, 101, 109, 209, 140, 69, 18, 224, 71,
+            189, 151, 33, 0, 0, 0, 0, 0, 0, 0, 0, 100, 0, 20, 98, 105, 103, 95, 100, 97, 116, 97,
+            95, 114, 101, 100, 105, 115, 95, 83, 85, 73, 84, 69, 97, 0, 98, 5, 194, 32, 1, 88, 100,
+            0, 13, 110, 111, 110, 111, 100, 101, 64, 110, 111, 104, 111, 115, 116, 0, 0, 3, 87, 0,
+            0, 0, 0, 0, 0, 0, 0,
+        ];
+        let expected = RawTerm::Function {
+            size: 88,
+            arity: 0,
+            uniq: [
+                184, 68, 0, 56, 201, 101, 109, 209, 140, 69, 18, 224, 71, 189, 151, 33,
+            ],
+            index: 0,
+            module: Box::new(RawTerm::AtomDeprecated("big_data_redis_SUITE".into())),
+            old_index: Box::new(RawTerm::SmallInt(0)),
+            old_uniq: Box::new(RawTerm::Int(96608257)),
+            pid: Box::new(RawTerm::NewPid {
+                node: Box::new(RawTerm::AtomDeprecated("nonode@nohost".into())),
+                id: 855,
+                serial: 0,
+                creation: 0,
+            }),
+            free_var: Vec::new(),
+        };
+        let out = RawTerm::from_bytes(input).unwrap();
+        assert_eq!(expected, out);
+        assert_eq!(&expected.to_bytes(), input);
     }
 
     #[test]

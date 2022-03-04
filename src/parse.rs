@@ -47,6 +47,7 @@ fn term(input: &[u8]) -> IResult<&[u8], RawTerm> {
         SMALL_BIG_EXT => (small_big_int),
         LARGE_BIG_EXT => (large_big_int),
         PID_EXT => (pid),
+        NEW_PID_EXT => (new_pid),
         PORT_EXT => (port),
         NEW_REFERENCE_EXT => (reference),
         NEW_FUN_EXT => (function),
@@ -78,6 +79,7 @@ fn term(input: &[u8]) -> IResult<&[u8], RawTerm> {
         SMALL_BIG_EXT => (small_big_int),
         LARGE_BIG_EXT => (large_big_int),
         PID_EXT => (pid),
+        NEW_PID_EXT => (new_pid),
         PORT_EXT => (port),
         NEW_REFERENCE_EXT => (reference),
         NEW_FUN_EXT => (function),
@@ -156,7 +158,33 @@ fn node_or_module(input: &[u8]) -> IResult<&[u8], RawTerm> {
 fn small_int_or_int(input: &[u8]) -> IResult<&[u8], RawTerm> {
     alt((small_int, int))(input)
 }
+fn pid_or_new_pid(input: &[u8]) -> IResult<&[u8], RawTerm> {
+    let func = match input[0] {
+        NEW_PID_EXT => new_pid,
+        PID_EXT => pid,
+        _ => {
+            return Err(Err::Error(nom::error::Error::new(input, ErrorKind::NoneOf)));
+        }
+    };
+    func(input)
+}
+fn new_pid(input: &[u8]) -> IResult<&[u8], RawTerm> {
+    let get_data = tuple((node_or_module, take(4usize), take(4usize), take(4usize)));
+    let (i, (node, id, serial, creation)) = preceded(tag(&[NEW_PID_EXT]), get_data)(input)?;
+    let id = slice_to_u32(id);
+    let serial = slice_to_u32(serial);
+    let creation = slice_to_u32(creation);
 
+    Ok((
+        i,
+        RawTerm::NewPid {
+            node: Box::new(node),
+            id,
+            serial,
+            creation,
+        },
+    ))
+}
 fn pid(input: &[u8]) -> IResult<&[u8], RawTerm> {
     let get_data = tuple((node_or_module, take(4usize), take(4usize), take(1usize)));
 
@@ -220,7 +248,7 @@ fn function(input: &[u8]) -> IResult<&[u8], RawTerm> {
         node_or_module,
         small_int_or_int,
         small_int_or_int,
-        pid,
+        pid_or_new_pid,
     ));
 
     let (i, (size, arity, uniq, index, num_free, module, old_index, old_uniq, pid)) =

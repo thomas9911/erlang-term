@@ -53,6 +53,12 @@ pub fn internal_to_binary(raw: RawTerm, add_prefix: bool) -> Vec<u8> {
             serial,
             creation,
         } => pid(*node, id, serial, creation, add_prefix),
+        NewPid {
+            node,
+            id,
+            serial,
+            creation,
+        } => new_pid(*node, id, serial, creation, add_prefix),
         Function {
             size,
             arity,
@@ -365,7 +371,21 @@ fn pid(node: RawTerm, id: u32, serial: u32, creation: u8, add_prefix: bool) -> V
     buffer.push(creation);
     buffer
 }
+fn new_pid(node: RawTerm, id: u32, serial: u32, creation: u32, add_prefix: bool) -> Vec<u8> {
+    let node_binary = internal_to_binary(node, false);
 
+    let mut buffer = Vec::with_capacity(node_binary.len() + 11);
+
+    if add_prefix {
+        push_prefix(&mut buffer)
+    };
+    buffer.push(NEW_PID_EXT);
+    buffer.extend(node_binary);
+    buffer.extend(&(id as u32).to_be_bytes());
+    buffer.extend(&(serial as u32).to_be_bytes());
+    buffer.extend(&(creation as u32).to_be_bytes());
+    buffer
+}
 fn function(
     size: u32,
     arity: u8,

@@ -1,2 +1,8 @@
 /target
 Cargo.lock
+
+# for elixir/rustler checks
+/rustler_test
+
+# for local bench files
+/bench

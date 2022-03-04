@@ -48,12 +48,49 @@ impl<'a> Decoder<'a> for RawTerm {
     }
 }
 
+// impl Encoder for RawTerm {
+//     fn encode<'a>(&self, env: rustler::Env<'a>) -> rustler::Term<'a> {
+//         use RawTerm::*;
+//         match self {
+//             SmallInt(x) => {
+//                 x.encode(env)
+//             }
+//             Int(x) => {
+//                 x.encode(env)
+//             }
+//             SmallTuple(x) | LargeTuple(x) => {
+//                 let result: Vec<_> = x.iter().map(|x| x.encode(env)).collect();
+//                 make_tuple(env, &result)
+//             }
+//             Map(x) => {}
+//             Nil => {}
+//             String(x) => {
+//                 x.encode(env)
+//             }
+//             List(x) => {
+//                 // let result: Vec<_> = x.iter().map(|x| x.encode(env)).collect();
+//                 x.encode(env)
+
+//             }
+//             Improper(x) => {}
+//             Binary(x) => {}
+//             SmallBigInt(x) | LargeBigInt(x) => {}
+//             Float(x) => {
+//                 x.encode(env)
+//             }
+//             Atom(x) | SmallAtom(x) | AtomDeprecated(x) | SmallAtomDeprecated(x) => {
+//                 Atom::from_str(env, &x).unwrap().encode(env)
+//             }
+//             Pid { .. } | Port { .. } | Ref { .. } | Function { .. } => {
+//                 Error::Atom("cannot_encoded").encode(env)
+//             }
+//         }
+//     }
+// }
+
 fn raw_term_decode_number<'a>(term: rustler::Term<'a>) -> Result<RawTerm, Error> {
-    // if let Ok(bit) = term.decode::<u8>() {
-    //     Ok(RawTerm::SmallInt(bit))
-    // } else 
     if let Ok(integer) = term.decode::<i32>() {
-        if integer < 256 && integer >= 0{
+        if integer < 256 && integer >= 0 {
             Ok(RawTerm::SmallInt(integer as u8))
         } else {
             Ok(RawTerm::Int(integer))

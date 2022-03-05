@@ -5,7 +5,7 @@ use nom::Err as NomErr;
 use num_bigint::BigInt;
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
 pub enum RawTerm {
     // ATOM_CACHE_REF
@@ -474,18 +474,7 @@ mod from_term_tests {
         use RawTerm::*;
 
         let input = read_binary("bins/map.bin").unwrap();
-        if let Map(mut out) = from_bytes(&input).unwrap() {
-            out.sort_by(|a, b| a.partial_cmp(b).unwrap());
-            // let mut map = Vec::new();
-
-            // map.push((
-            //     RawTerm::AtomDeprecated("just".to_string()),
-            //     RawTerm::Binary(b"some key".to_vec()),
-            // ));
-            // map.push((
-            //     RawTerm::AtomDeprecated("other".to_string()),
-            //     RawTerm::Binary(b"value".to_vec()),
-            // ));
+        if let Map(out) = from_bytes(&input).unwrap() {
             let mut map = vec![
                 (Binary(b"float".to_vec()), Float(3.14)),
                 (
@@ -512,9 +501,21 @@ mod from_term_tests {
                     Map(vec![(Binary(b"ok".to_vec()), Nil)]),
                 ),
             ];
-            map.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
-            assert_eq!(map, out);
+            for item in out.iter() {
+                if let Some(index) =
+                    map.iter()
+                        .enumerate()
+                        .find_map(|(i, x)| if x == item { Some(i) } else { None })
+                {
+                    map.remove(index);
+                } else {
+                    panic!("input has more items then expected")
+                }
+            }
+
+            assert!(!out.is_empty());
+            assert!(map.is_empty());
         } else {
             assert!(false);
         }

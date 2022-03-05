@@ -7,6 +7,8 @@ use num_bigint::BigInt;
 use std::collections::HashMap;
 use std::iter::FromIterator;
 
+mod ord;
+
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde_impl", serde(untagged))]

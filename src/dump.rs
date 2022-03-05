@@ -607,8 +607,8 @@ mod binary_tests {
     #[test]
     fn map() {
         use RawTerm::*;
-        let mut map = vec![
-            (Binary(b"float".to_vec()), Float(3.14)),
+        let map = vec![
+            (SmallInt(1), Binary(b"one".to_vec())),
             (
                 List(vec![Binary(b"list as a key".to_vec())]),
                 List(vec![
@@ -619,11 +619,7 @@ mod binary_tests {
                     )]),
                 ]),
             ),
-            (SmallInt(1), Binary(b"one".to_vec())),
-            (
-                AtomDeprecated("tuple".to_string()),
-                SmallTuple(vec![SmallInt(1), AtomDeprecated("more".to_string())]),
-            ),
+            (Binary(b"float".to_vec()), Float(3.14)),
             (
                 Binary(b"large".to_vec()),
                 SmallBigInt(BigInt::parse_bytes(b"123456789123456789", 10).unwrap()),
@@ -632,8 +628,12 @@ mod binary_tests {
                 Binary(b"nested".to_vec()),
                 Map(vec![(Binary(b"ok".to_vec()), Nil)]),
             ),
+            (
+                AtomDeprecated("tuple".to_string()),
+                SmallTuple(vec![SmallInt(1), AtomDeprecated("more".to_string())]),
+            ),
         ];
-        map.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        dbg!(&map);
         let out = to_bytes(RawTerm::Map(map));
 
         assert_eq!(

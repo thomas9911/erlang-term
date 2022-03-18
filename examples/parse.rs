@@ -1,8 +1,14 @@
 use erlang_term::Term;
 
-///
-/// cargo run --example parse "$(elixir -e ":erlang.term_to_binary(%{ok: 15}) |> IO.inspect()")"
-///  
+
+const HELP_TEXT: &'static str = r###"parse elixir binary to Term
+
+example: 
+    cargo run --example parse "$(elixir -e ":erlang.term_to_binary(%{{ok: 15}}) |> IO.inspect()")"
+
+    cargo run --example parse "<<131, 97, 4>>"
+"###;
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
 
@@ -27,16 +33,7 @@ fn main() {
 
 fn print_help(input: &str) -> bool {
     if ["help", "-h", "--help"].contains(&input) {
-        println!(
-            r###"
-            parse elixir binary to Term
-
-            example: 
-                cargo run --example parse "$(elixir -e ":erlang.term_to_binary(%{{ok: 15}}) |> IO.inspect()")"
-
-                cargo run --example parse "<<131, 97, 4>>"
-        "###
-        );
+        println!("{}", HELP_TEXT);
 
         return true;
     }

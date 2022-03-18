@@ -36,6 +36,7 @@ defmodule TermGenerator do
         save({"test", "testing"}, "tuple")
         save(123456789123456789123456789, "small_big_int")
         save(Exp.exp(999,999), "large_big_int")
+        save({:row_data, "kkk", List.to_tuple(Enum.to_list(1..400)), 10}, "large_tuple")
         # save(&testing/2, "function")
         # save(self(), "pid")
 

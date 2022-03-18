@@ -4,8 +4,10 @@ use nom::error::Error;
 use nom::Err as NomErr;
 use num_bigint::BigInt;
 use std::collections::HashMap;
+use strum::EnumDiscriminants;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, EnumDiscriminants)]
+#[strum_discriminants(name(RawTermType))]
 #[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
 pub enum RawTerm {
     // ATOM_CACHE_REF
@@ -81,6 +83,14 @@ impl RawTerm {
     #[cfg(feature = "zlib")]
     pub fn to_gzip_bytes(self, level: flate2::Compression) -> std::io::Result<Vec<u8>> {
         crate::to_gzip_bytes(self, level)
+    }
+
+    pub fn as_type(&self) -> RawTermType {
+        RawTermType::from(self)
+    }
+
+    pub fn as_general_type(&self) -> RawTermGeneralType {
+        RawTermGeneralType::from(self.as_type())
     }
 
     pub fn is_atom(&self) -> bool {
@@ -259,6 +269,60 @@ fn atom_to_raw_term(input: String) -> RawTerm {
         RawTerm::SmallAtom(input)
     } else {
         RawTerm::Atom(input)
+    }
+}
+
+#[derive(Debug, PartialEq, PartialOrd)]
+/// enum use for implement Ordering in the raw terms
+pub enum RawTermGeneralType {
+    // Improper should not be used for ordering.
+    Improper,
+    Number,
+    Atom,
+    Reference,
+    Fun,
+    Port,
+    Pid,
+    Tuple,
+    Map,
+    Nil,
+    List,
+    BitString,
+}
+
+impl From<RawTermType> for RawTermGeneralType {
+    fn from(item: RawTermType) -> RawTermGeneralType {
+        RawTermGeneralType::from(&item)
+    }
+}
+
+impl From<&RawTermType> for RawTermGeneralType {
+    fn from(item: &RawTermType) -> RawTermGeneralType {
+        use RawTermType::*;
+        match item {
+            SmallInt => RawTermGeneralType::Number,
+            Int => RawTermGeneralType::Number,
+            SmallTuple => RawTermGeneralType::Tuple,
+            LargeTuple => RawTermGeneralType::Tuple,
+            Map => RawTermGeneralType::Map,
+            Nil => RawTermGeneralType::Nil,
+            String => RawTermGeneralType::BitString,
+            List => RawTermGeneralType::List,
+            Improper => RawTermGeneralType::Improper,
+            Binary => RawTermGeneralType::BitString,
+            SmallBigInt => RawTermGeneralType::Number,
+            LargeBigInt => RawTermGeneralType::Number,
+            Pid => RawTermGeneralType::Pid,
+            NewPid => RawTermGeneralType::Pid,
+            Port => RawTermGeneralType::Port,
+            Ref => RawTermGeneralType::Reference,
+            Function => RawTermGeneralType::Fun,
+            Float => RawTermGeneralType::Number,
+            Atom => RawTermGeneralType::Atom,
+            SmallAtom => RawTermGeneralType::Atom,
+            AtomDeprecated => RawTermGeneralType::Atom,
+            SmallAtomDeprecated => RawTermGeneralType::Atom,
+        }
     }
 }
 
@@ -721,4 +785,61 @@ mod from_term_tests {
         let out = from_bytes(&input).unwrap();
         assert!(out.is_list());
     }
+}
+
+#[cfg(test)]
+mod as_type_tests {
+    use crate::raw_term::RawTermType;
+    use crate::RawTerm;
+
+    #[test]
+    fn as_type_binary() {
+        let term = RawTerm::Binary(vec![1, 2, 3, 4]);
+
+        assert_eq!(RawTermType::Binary, term.as_type())
+    }
+
+    #[test]
+    fn as_type_float() {
+        let term = RawTerm::Float(0.123);
+
+        assert_eq!(RawTermType::Float, term.as_type())
+    }
+
+    #[test]
+    fn as_type_nil() {
+        let term = RawTerm::Nil;
+
+        assert_eq!(RawTermType::Nil, term.as_type())
+    }
+
+    #[test]
+    fn as_type_map() {
+        let term = RawTerm::Map(vec![(RawTerm::Atom(String::from("test")), RawTerm::Nil)]);
+
+        assert_eq!(RawTermType::Map, term.as_type())
+    }
+}
+
+#[test]
+fn raw_sub_type_ordering() {
+    use RawTermGeneralType::*;
+    // number < atom < reference < fun < port < pid < tuple < map < nil < list < bit string
+
+    // Improper should not be used for ordering.
+    assert!(Improper < Number);
+
+    assert!(Number < Atom);
+    assert!(Atom < Reference);
+    assert!(Reference < Fun);
+    assert!(Fun < Port);
+    assert!(Port < Pid);
+    assert!(Pid < Tuple);
+    assert!(Tuple < Map);
+    assert!(Map < Nil);
+    assert!(Nil < List);
+    assert!(List < BitString);
+
+    assert!(Number < BitString);
+    assert!(!(Number > BitString));
 }

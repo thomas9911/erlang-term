@@ -7,7 +7,10 @@ use num_bigint::BigInt;
 use std::collections::HashMap;
 use std::iter::FromIterator;
 
+mod improper_list;
 mod ord;
+
+pub use improper_list::ImproperList;
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
@@ -238,6 +241,14 @@ impl Term {
         use Term::*;
         match self {
             Tuple(x) if x.len() == 2 => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_list(&self) -> bool {
+        use Term::*;
+        match self {
+            List(_) => true,
             _ => false,
         }
     }

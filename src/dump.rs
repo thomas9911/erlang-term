@@ -47,6 +47,7 @@ pub fn internal_to_binary(raw: RawTerm, add_prefix: bool) -> Vec<u8> {
         Map(x) => map(x, add_prefix),
         Port { node, id, creation } => port(*node, id, creation, add_prefix),
         Ref { node, id, creation } => reference(*node, id, creation, add_prefix),
+        NewerRef { node, id, creation } => newer_reference(*node, id, creation, add_prefix),
         Pid {
             node,
             id,
@@ -351,7 +352,28 @@ fn reference(node: RawTerm, id: Vec<u32>, creation: u8, add_prefix: bool) -> Vec
     buffer.push(NEW_REFERENCE_EXT);
     buffer.extend(&(id_length as u16).to_be_bytes());
     buffer.extend(node_binary);
-    buffer.push(creation);
+    buffer.extend(creation.to_be_bytes());
+    buffer.extend(id_bytes);
+    buffer
+}
+
+fn newer_reference(node: RawTerm, id: Vec<u32>, creation: u32, add_prefix: bool) -> Vec<u8> {
+    let id_length = id.len();
+    let node_binary = internal_to_binary(node, false);
+    let mut id_bytes: Vec<u8> = Vec::new();
+    for part in id {
+        id_bytes.extend(&(part as u32).to_be_bytes());
+    }
+
+    let mut buffer = Vec::with_capacity(node_binary.len() + id_bytes.len() + 5);
+
+    if add_prefix {
+        push_prefix(&mut buffer)
+    };
+    buffer.push(NEWER_REFERENCE_EXT);
+    buffer.extend(&(id_length as u16).to_be_bytes());
+    buffer.extend(node_binary);
+    buffer.extend(creation.to_be_bytes());
     buffer.extend(id_bytes);
     buffer
 }
@@ -683,6 +705,24 @@ mod binary_tests {
                 REVISION, 114, 0, 3, 100, 0, 19, 115, 111, 109, 101, 116, 104, 105, 110, 103, 64,
                 115, 111, 109, 101, 116, 104, 105, 110, 103, 2, 0, 2, 108, 6, 26, 36, 0, 6, 0, 3,
                 158, 77
+            ]
+        )
+    }
+
+    #[test]
+    fn newer_reference() {
+        let out = to_bytes(RawTerm::NewerRef {
+            node: Box::new(RawTerm::AtomDeprecated("something@something".to_string())),
+            id: vec![158726, 438566918, 237133],
+            creation: 2,
+        });
+
+        assert_eq!(
+            out,
+            vec![
+                REVISION, 90, 0, 3, 100, 0, 19, 115, 111, 109, 101, 116, 104, 105, 110, 103, 64,
+                115, 111, 109, 101, 116, 104, 105, 110, 103, 0, 0, 0, 2, 0, 2, 108, 6, 26, 36, 0,
+                6, 0, 3, 158, 77
             ]
         )
     }

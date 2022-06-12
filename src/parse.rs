@@ -49,7 +49,8 @@ fn term(input: &[u8]) -> IResult<&[u8], RawTerm> {
         PID_EXT => (pid),
         NEW_PID_EXT => (new_pid),
         PORT_EXT => (port),
-        NEW_REFERENCE_EXT => (reference),
+        NEW_REFERENCE_EXT => (reference_new),
+        NEWER_REFERENCE_EXT => (reference_newer),
         NEW_FUN_EXT => (function),
         _ => {
             return Err(Err::Error(nom::error::Error::new(input, ErrorKind::NoneOf)));
@@ -81,7 +82,8 @@ fn term(input: &[u8]) -> IResult<&[u8], RawTerm> {
         PID_EXT => (pid),
         NEW_PID_EXT => (new_pid),
         PORT_EXT => (port),
-        NEW_REFERENCE_EXT => (reference),
+        NEW_REFERENCE_EXT => (reference_new),
+        NEWER_REFERENCE_EXT => (reference_newer),
         NEW_FUN_EXT => (function),
         ZLIB => (gzip),
         _ => {
@@ -221,7 +223,7 @@ fn port(input: &[u8]) -> IResult<&[u8], RawTerm> {
     ))
 }
 
-fn reference(input: &[u8]) -> IResult<&[u8], RawTerm> {
+fn reference_new(input: &[u8]) -> IResult<&[u8], RawTerm> {
     let get_data = tuple((take(2usize), node_or_module, take(1usize)));
     let (i, (length, node, creation)) = preceded(tag(&[NEW_REFERENCE_EXT]), get_data)(input)?;
     let length = slice_to_u16(length) as usize;
@@ -231,6 +233,23 @@ fn reference(input: &[u8]) -> IResult<&[u8], RawTerm> {
     Ok((
         i,
         RawTerm::Ref {
+            node: Box::new(node),
+            id,
+            creation: creation,
+        },
+    ))
+}
+
+fn reference_newer(input: &[u8]) -> IResult<&[u8], RawTerm> {
+    let get_data = tuple((take(2usize), node_or_module, take(4usize)));
+    let (i, (length, node, creation)) = preceded(tag(&[NEWER_REFERENCE_EXT]), get_data)(input)?;
+    let length = slice_to_u16(length) as usize;
+    let (i, id_bytes) = take(4 * length)(i)?;
+    let creation = slice_to_u32(creation);
+    let id: Vec<u32> = id_bytes.chunks(4).map(|x| slice_to_u32(x)).collect();
+    Ok((
+        i,
+        RawTerm::NewerRef {
             node: Box::new(node),
             id,
             creation,

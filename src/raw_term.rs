@@ -48,6 +48,11 @@ pub enum RawTerm {
         id: Vec<u32>,
         creation: u8,
     },
+    NewerRef {
+        node: Box<RawTerm>,
+        id: Vec<u32>,
+        creation: u32,
+    },
     Function {
         size: u32,
         arity: u8,
@@ -316,6 +321,7 @@ impl From<&RawTermType> for RawTermGeneralType {
             NewPid => RawTermGeneralType::Pid,
             Port => RawTermGeneralType::Port,
             Ref => RawTermGeneralType::Reference,
+            NewerRef => RawTermGeneralType::Reference,
             Function => RawTermGeneralType::Fun,
             Float => RawTermGeneralType::Number,
             Atom => RawTermGeneralType::Atom,

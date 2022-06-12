@@ -2,7 +2,6 @@ use crate::Term;
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde_impl", serde(untagged))]
 pub struct ImproperList {
     head: Vec<Term>,
     tail: Option<Term>,

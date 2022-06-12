@@ -42,6 +42,14 @@ impl RawTermType {
     }
 }
 
+impl Eq for RawTerm {}
+
+impl Ord for RawTerm {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).expect("total order not found")
+    }
+}
+
 impl PartialOrd for RawTerm {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         if self == other {
@@ -67,18 +75,14 @@ impl PartialOrd for RawTerm {
                 number_cmp(self, other).or_else(|| number_cmp(other, self).map(Ordering::reverse))
             }
             RawTermGeneralType::Reference => ref_cmp(self, other),
-            RawTermGeneralType::Pid => {
-                pid_cmp(self, other).or_else(|| pid_cmp(other, self).map(Ordering::reverse))
-            }
+            RawTermGeneralType::Pid => pid_cmp(self, other),
+            RawTermGeneralType::Port => port_cmp(self, other),
             RawTermGeneralType::BitString => bitstring_cmp(self, other),
             RawTermGeneralType::List => list_cmp(self, other),
-            // Fun,
-            // Port,
-            // Tuple,
-            // Map,
-            // Nil,
-            // List,
-            // BitString,
+            RawTermGeneralType::Tuple => tuple_cmp(self, other),
+            RawTermGeneralType::Map => map_cmp(self, other),
+            RawTermGeneralType::Fun => func_cmp(self, other),
+            RawTermGeneralType::Nil => Some(Ordering::Equal),
             _ => panic!(),
         }
     }
@@ -140,6 +144,18 @@ fn number_cmp(left: &RawTerm, right: &RawTerm) -> Option<Ordering> {
     }
 }
 
+fn tuple_cmp(left: &RawTerm, right: &RawTerm) -> Option<Ordering> {
+    use RawTerm::*;
+
+    match (left, right) {
+        (SmallTuple(a), SmallTuple(b)) => a.partial_cmp(b),
+        (LargeTuple(a), SmallTuple(b)) => a.partial_cmp(b),
+        (SmallTuple(a), LargeTuple(b)) => a.partial_cmp(b),
+        (LargeTuple(a), LargeTuple(b)) => a.partial_cmp(b),
+        _ => None,
+    }
+}
+
 fn ref_cmp(left: &RawTerm, right: &RawTerm) -> Option<Ordering> {
     use RawTerm::*;
 
@@ -147,21 +163,51 @@ fn ref_cmp(left: &RawTerm, right: &RawTerm) -> Option<Ordering> {
         (
             Ref {
                 creation: creation_a,
-                id: a,
+                id: id_a,
                 ..
             },
             Ref {
                 creation: creation_b,
-                id: b,
+                id: id_b,
                 ..
             },
-        ) => {
-            if creation_a == creation_b {
-                a.partial_cmp(b)
-            } else {
-                creation_a.partial_cmp(creation_b)
-            }
-        }
+        ) => (creation_a, id_a).partial_cmp(&(creation_b, id_b)),
+        (
+            NewerRef {
+                creation: creation_a,
+                id: id_a,
+                ..
+            },
+            NewerRef {
+                creation: creation_b,
+                id: id_b,
+                ..
+            },
+        ) => (creation_a, id_a).partial_cmp(&(creation_b, id_b)),
+        (
+            NewerRef {
+                creation: creation_a,
+                id: id_a,
+                ..
+            },
+            Ref {
+                creation: creation_b,
+                id: id_b,
+                ..
+            },
+        ) => (creation_a, id_a).partial_cmp(&(&(*creation_b as u32), id_b)),
+        (
+            Ref {
+                creation: creation_a,
+                id: id_a,
+                ..
+            },
+            NewerRef {
+                creation: creation_b,
+                id: id_b,
+                ..
+            },
+        ) => (&(*creation_a as u32), id_a).partial_cmp(&(creation_b, id_b)),
         _ => None,
     }
 }
@@ -183,67 +229,7 @@ fn pid_cmp(left: &RawTerm, right: &RawTerm) -> Option<Ordering> {
                 creation: creation_b,
                 ..
             },
-        ) if (creation_a == creation_b) && (id_a == id_b) => serial_a.partial_cmp(serial_b),
-        (
-            NewPid {
-                id: id_a,
-                creation: creation_a,
-                ..
-            },
-            NewPid {
-                id: id_b,
-                creation: creation_b,
-                ..
-            },
-        ) if (creation_a == creation_b) => id_a.partial_cmp(id_b),
-        (
-            NewPid {
-                creation: creation_a,
-                ..
-            },
-            NewPid {
-                creation: creation_b,
-                ..
-            },
-        ) => creation_a.partial_cmp(creation_b),
-        (
-            Pid {
-                id: id_a,
-                serial: serial_a,
-                creation: creation_a,
-                ..
-            },
-            NewPid {
-                id: id_b,
-                serial: serial_b,
-                creation: creation_b,
-                ..
-            },
-        ) if (&(*creation_a as u32) == creation_b) && (id_a == id_b) => {
-            serial_a.partial_cmp(serial_b)
-        }
-        (
-            Pid {
-                id: id_a,
-                creation: creation_a,
-                ..
-            },
-            NewPid {
-                id: id_b,
-                creation: creation_b,
-                ..
-            },
-        ) if (&(*creation_a as u32) == creation_b) => id_a.partial_cmp(id_b),
-        (
-            Pid {
-                creation: creation_a,
-                ..
-            },
-            NewPid {
-                creation: creation_b,
-                ..
-            },
-        ) => (*creation_a as u32).partial_cmp(creation_b),
+        ) => (creation_a, id_a, serial_a).partial_cmp(&(creation_b, id_b, serial_b)),
         (
             Pid {
                 id: id_a,
@@ -257,29 +243,91 @@ fn pid_cmp(left: &RawTerm, right: &RawTerm) -> Option<Ordering> {
                 creation: creation_b,
                 ..
             },
-        ) if (creation_a == creation_b) && (id_a == id_b) => serial_a.partial_cmp(serial_b),
+        ) => (creation_a, id_a, serial_a).partial_cmp(&(creation_b, id_b, serial_b)),
         (
-            Pid {
+            NewPid {
                 id: id_a,
+                serial: serial_a,
                 creation: creation_a,
                 ..
             },
             Pid {
                 id: id_b,
+                serial: serial_b,
                 creation: creation_b,
                 ..
             },
-        ) if (creation_a == creation_b) => id_a.partial_cmp(id_b),
+        ) => (creation_a, id_a, serial_a).partial_cmp(&(&(*creation_b as u32), id_b, serial_b)),
         (
             Pid {
+                id: id_a,
+                serial: serial_a,
                 creation: creation_a,
                 ..
             },
-            Pid {
+            NewPid {
+                id: id_b,
+                serial: serial_b,
                 creation: creation_b,
                 ..
             },
-        ) => creation_a.partial_cmp(creation_b),
+        ) => (&(*creation_a as u32), id_a, serial_a).partial_cmp(&(creation_b, id_b, serial_b)),
+        _ => None,
+    }
+}
+
+fn port_cmp(left: &RawTerm, right: &RawTerm) -> Option<Ordering> {
+    use RawTerm::*;
+
+    match (left, right) {
+        (
+            NewPort {
+                id: id_a,
+                creation: creation_a,
+                ..
+            },
+            NewPort {
+                id: id_b,
+                creation: creation_b,
+                ..
+            },
+        ) => (creation_a, id_a).partial_cmp(&(creation_b, id_b)),
+        (
+            Port {
+                id: id_a,
+                creation: creation_a,
+                ..
+            },
+            Port {
+                id: id_b,
+                creation: creation_b,
+                ..
+            },
+        ) => (creation_a, id_a).partial_cmp(&(creation_b, id_b)),
+        (
+            NewPort {
+                id: id_a,
+                creation: creation_a,
+                ..
+            },
+            Port {
+                id: id_b,
+                creation: creation_b,
+                ..
+            },
+        ) => (creation_a, id_a).partial_cmp(&(&(*creation_b as u32), id_b)),
+        (
+            Port {
+                id: id_a,
+                creation: creation_a,
+                ..
+            },
+            NewPort {
+                id: id_b,
+                creation: creation_b,
+                ..
+            },
+        ) => (&(*creation_a as u32), id_a).partial_cmp(&(creation_b, id_b)),
         _ => None,
     }
 }
@@ -301,6 +349,50 @@ fn list_cmp(left: &RawTerm, right: &RawTerm) -> Option<Ordering> {
 
     match (left, right) {
         (List(a), List(b)) => a.partial_cmp(b),
+        _ => None,
+    }
+}
+
+fn map_cmp(left: &RawTerm, right: &RawTerm) -> Option<Ordering> {
+    use RawTerm::*;
+
+    match (left, right) {
+        (Map(a), Map(b)) => a.partial_cmp(b),
+        _ => None,
+    }
+}
+
+fn func_cmp(left: &RawTerm, right: &RawTerm) -> Option<Ordering> {
+    // note that this is not the way erlang does it, but it is something
+    // If you know how erlang compares functions let me know.
+    match (left, right) {
+        (
+            RawTerm::Function {
+                size: a1,
+                arity: b1,
+                uniq: c1,
+                index: d1,
+                module: e1,
+                old_index: f1,
+                old_uniq: g1,
+                pid: h1,
+                free_var: i1,
+            },
+            RawTerm::Function {
+                size: a2,
+                arity: b2,
+                uniq: c2,
+                index: d2,
+                module: e2,
+                old_index: f2,
+                old_uniq: g2,
+                pid: h2,
+                free_var: i2,
+            },
+        ) => {
+            (a1, b1, c1, d1, e1, f1, g1, h1, i1).partial_cmp(&(a2, b2, c2, d2, e2, f2, g2, h2, i2))
+        }
+
         _ => None,
     }
 }
@@ -352,18 +444,87 @@ fn list_cmp(left: &RawTerm, right: &RawTerm) -> Option<Ordering> {
 //     }
 // }
 
+// #[test]
+// fn xd() {
+//     let bytes = [
+//         131, 88, 100, 0, 13, 110, 111, 110, 111, 100, 101, 64, 110, 111, 104, 111, 115, 116, 0, 0,
+//         0, 110, 0, 0, 0, 1, 0, 0, 0, 0,
+//     ];
+//     let term = RawTerm::from_bytes(&bytes);
+
+//     dbg!(term);
+
+//     // dbg!(1.partial_cmp(&0));
+//     // dbg!(u8::MIN);
+//     // dbg!((1, 3usize, 1).partial_cmp(&(1, 3usize, 0)));
+//     // let a = RawTerm::NewPid{creation: 1, id: 2, serial: 3, node: Box::new(RawTerm::AtomDeprecated("test".to_string()))};
+//     // let b = RawTerm::Pid{creation: 1, id: 2, serial: 4, node: Box::new(RawTerm::AtomDeprecated("test".to_string()))};
+//     // dbg!(a.partial_cmp(&b));
+
+//     panic!()
+// }
+
 #[test]
-fn xd() {
-    let bytes = [
-        131, 88, 100, 0, 13, 110, 111, 110, 111, 100, 101, 64, 110, 111, 104, 111, 115, 116, 0, 0,
-        0, 110, 0, 0, 0, 1, 0, 0, 0, 0,
-    ];
-    let term = RawTerm::from_bytes(&bytes);
+fn compare_pids() {
+    let a = RawTerm::NewPid {
+        creation: 1,
+        id: 2,
+        serial: 3,
+        node: Box::new(RawTerm::AtomDeprecated("test".to_string())),
+    };
+    let b = RawTerm::Pid {
+        creation: 1,
+        id: 2,
+        serial: 4,
+        node: Box::new(RawTerm::AtomDeprecated("test".to_string())),
+    };
+    let c = RawTerm::NewPid {
+        creation: 1,
+        id: 3,
+        serial: 3,
+        node: Box::new(RawTerm::AtomDeprecated("test".to_string())),
+    };
+    let d = RawTerm::Pid {
+        creation: 4,
+        id: 2,
+        serial: 4,
+        node: Box::new(RawTerm::AtomDeprecated("test".to_string())),
+    };
 
-    dbg!(term);
+    assert_eq!(Some(Ordering::Less), a.partial_cmp(&b));
+    assert_eq!(Some(Ordering::Greater), c.partial_cmp(&a));
+    assert_eq!(Some(Ordering::Greater), d.partial_cmp(&b));
+}
 
-    // dbg!(1.partial_cmp(&0));
-    // dbg!(u8::MIN);
+#[test]
+fn ordering_test() {
+    // (RawTerm::Int(2), RawTerm::List(vec![RawTerm::Binary]))
 
-    panic!()
+    let mut map = std::collections::BTreeMap::new();
+
+    map.insert(
+        RawTerm::Int(2),
+        RawTerm::List(vec![RawTerm::Atom(String::from("test"))]),
+    );
+    map.insert(
+        RawTerm::Int(4),
+        RawTerm::List(vec![RawTerm::Atom(String::from("testing"))]),
+    );
+    map.insert(
+        RawTerm::Binary(vec![123, 50, 90]),
+        RawTerm::List(vec![RawTerm::Atom(String::from("ordering"))]),
+    );
+    map.insert(
+        RawTerm::NewPort {
+            creation: 123,
+            id: 1,
+            node: Box::new(RawTerm::AtomDeprecated(String::from("localhost"))),
+        },
+        RawTerm::List(vec![RawTerm::Atom(String::from("ordering"))]),
+    );
+
+    assert_eq!(
+        &RawTerm::List(vec![RawTerm::Atom(String::from("ordering"))]),
+        map.get(&RawTerm::Binary(vec![123, 50, 90])).unwrap()
+    )
 }

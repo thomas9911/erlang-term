@@ -3,7 +3,7 @@ use keylist::Keylist;
 use nom::error::Error;
 use nom::Err as NomErr;
 use num_bigint::BigInt;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use strum::EnumDiscriminants;
 
 #[derive(Debug, Clone, PartialEq, EnumDiscriminants)]
@@ -18,7 +18,8 @@ pub enum RawTerm {
     // NEW_PID,
     SmallTuple(Vec<RawTerm>),
     LargeTuple(Vec<RawTerm>),
-    Map(Vec<(RawTerm, RawTerm)>),
+    // Map(Vec<(RawTerm, RawTerm)>),
+    Map(BTreeMap<RawTerm, RawTerm>),
     Nil,
     String(Vec<u8>),
     List(Vec<RawTerm>),
@@ -42,6 +43,11 @@ pub enum RawTerm {
         node: Box<RawTerm>,
         id: u32,
         creation: u8,
+    },
+    NewPort {
+        node: Box<RawTerm>,
+        id: u32,
+        creation: u32,
     },
     Ref {
         node: Box<RawTerm>,
@@ -228,7 +234,7 @@ fn keyword_to_raw_term(keyword: Keylist<String, Term>) -> RawTerm {
 }
 
 fn map_arbitrary_to_raw_term(map: Keylist<Term, Term>) -> RawTerm {
-    let tmp: Vec<(RawTerm, RawTerm)> = map
+    let tmp = map
         .into_iter()
         .map(|(k, v)| (RawTerm::from(k), RawTerm::from(v)))
         .collect();
@@ -236,9 +242,9 @@ fn map_arbitrary_to_raw_term(map: Keylist<Term, Term>) -> RawTerm {
 }
 
 fn map_to_raw_term(map: HashMap<String, Term>) -> RawTerm {
-    let tmp: Vec<(RawTerm, RawTerm)> = map
+    let tmp = map
         .into_iter()
-        .map(|(k, v)| (string_to_raw_term(k), RawTerm::from(v)))
+        .map(|(k, v)| (RawTerm::Binary(k.as_bytes().to_vec()), RawTerm::from(v)))
         .collect();
     RawTerm::Map(tmp)
 }
@@ -320,6 +326,7 @@ impl From<&RawTermType> for RawTermGeneralType {
             Pid => RawTermGeneralType::Pid,
             NewPid => RawTermGeneralType::Pid,
             Port => RawTermGeneralType::Port,
+            NewPort => RawTermGeneralType::Port,
             Ref => RawTermGeneralType::Reference,
             NewerRef => RawTermGeneralType::Reference,
             Function => RawTermGeneralType::Fun,
@@ -417,17 +424,21 @@ mod from_term_tests {
         let input = read_binary("bins/struct.bin").unwrap();
         let out = from_bytes(&input).unwrap();
 
-        let expected = RawTerm::Map(vec![
-            (
-                RawTerm::AtomDeprecated("__struct__".to_string()),
-                RawTerm::AtomDeprecated("Elixir.TestStruct".to_string()),
-            ),
-            (
-                RawTerm::AtomDeprecated("a".to_string()),
-                RawTerm::AtomDeprecated("nil".to_string()),
-            ),
-            (RawTerm::AtomDeprecated("b".to_string()), RawTerm::Int(1234)),
-        ]);
+        let expected = RawTerm::Map(
+            vec![
+                (
+                    RawTerm::AtomDeprecated("__struct__".to_string()),
+                    RawTerm::AtomDeprecated("Elixir.TestStruct".to_string()),
+                ),
+                (
+                    RawTerm::AtomDeprecated("a".to_string()),
+                    RawTerm::AtomDeprecated("nil".to_string()),
+                ),
+                (RawTerm::AtomDeprecated("b".to_string()), RawTerm::Int(1234)),
+            ]
+            .into_iter()
+            .collect(),
+        );
 
         assert_eq!(expected, out);
     }
@@ -525,16 +536,16 @@ mod from_term_tests {
         let input = read_binary("bins/atom_map.bin").unwrap();
         let out = from_bytes(&input).unwrap();
 
-        let mut map = Vec::new();
+        let mut map = std::collections::BTreeMap::new();
 
-        map.push((
+        map.insert(
             RawTerm::AtomDeprecated("just".to_string()),
             RawTerm::Binary(b"some key".to_vec()),
-        ));
-        map.push((
+        );
+        map.insert(
             RawTerm::AtomDeprecated("other".to_string()),
             RawTerm::Binary(b"value".to_vec()),
-        ));
+        );
 
         assert_eq!(RawTerm::Map(map), out);
     }
@@ -554,7 +565,9 @@ mod from_term_tests {
                         Map(vec![(
                             AtomDeprecated("test".to_string()),
                             AtomDeprecated("false".to_string()),
-                        )]),
+                        )]
+                        .into_iter()
+                        .collect()),
                     ]),
                 ),
                 (SmallInt(1), Binary(b"one".to_vec())),
@@ -568,7 +581,7 @@ mod from_term_tests {
                 ),
                 (
                     Binary(b"nested".to_vec()),
-                    Map(vec![(Binary(b"ok".to_vec()), Nil)]),
+                    Map(vec![(Binary(b"ok".to_vec()), Nil)].into_iter().collect()),
                 ),
             ];
 
@@ -576,7 +589,7 @@ mod from_term_tests {
                 if let Some(index) =
                     map.iter()
                         .enumerate()
-                        .find_map(|(i, x)| if x == item { Some(i) } else { None })
+                        .find_map(|(i, (x, y))| if (x, y) == item { Some(i) } else { None })
                 {
                     map.remove(index);
                 } else {
@@ -821,7 +834,11 @@ mod as_type_tests {
 
     #[test]
     fn as_type_map() {
-        let term = RawTerm::Map(vec![(RawTerm::Atom(String::from("test")), RawTerm::Nil)]);
+        let term = RawTerm::Map(
+            vec![(RawTerm::Atom(String::from("test")), RawTerm::Nil)]
+                .into_iter()
+                .collect(),
+        );
 
         assert_eq!(RawTermType::Map, term.as_type())
     }

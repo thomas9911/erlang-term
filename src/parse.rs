@@ -14,6 +14,7 @@ use nom::sequence::{preceded, tuple};
 use nom::{Err as NomErr, IResult};
 use num_bigint::{BigInt, Sign};
 
+use std::collections::BTreeMap;
 use std::convert::TryInto;
 
 pub fn from_bytes(input: &[u8]) -> Result<RawTerm, NomErr<Error<&[u8]>>> {
@@ -49,6 +50,7 @@ fn term(input: &[u8]) -> IResult<&[u8], RawTerm> {
         PID_EXT => (pid),
         NEW_PID_EXT => (new_pid),
         PORT_EXT => (port),
+        NEW_PORT_EXT => (new_port),
         NEW_REFERENCE_EXT => (reference_new),
         NEWER_REFERENCE_EXT => (reference_newer),
         NEW_FUN_EXT => (function),
@@ -82,6 +84,7 @@ fn term(input: &[u8]) -> IResult<&[u8], RawTerm> {
         PID_EXT => (pid),
         NEW_PID_EXT => (new_pid),
         PORT_EXT => (port),
+        NEW_PORT_EXT => (new_port),
         NEW_REFERENCE_EXT => (reference_new),
         NEWER_REFERENCE_EXT => (reference_newer),
         NEW_FUN_EXT => (function),
@@ -216,6 +219,23 @@ fn port(input: &[u8]) -> IResult<&[u8], RawTerm> {
     Ok((
         i,
         RawTerm::Port {
+            node: Box::new(node),
+            id,
+            creation,
+        },
+    ))
+}
+
+fn new_port(input: &[u8]) -> IResult<&[u8], RawTerm> {
+    let get_data = tuple((node_or_module, take(4usize), take(4usize)));
+
+    let (i, (node, id, creation)) = preceded(tag(&[NEW_PORT_EXT]), get_data)(input)?;
+    let id = slice_to_u32(id);
+    let creation = slice_to_u32(creation);
+
+    Ok((
+        i,
+        RawTerm::NewPort {
             node: Box::new(node),
             id,
             creation,
@@ -359,11 +379,11 @@ fn map(input: &[u8]) -> IResult<&[u8], RawTerm> {
 
     let (i, t) = many_m_n(2 * length, 2 * length, term)(i)?;
 
-    let mut keyword: Vec<(RawTerm, RawTerm)> = Vec::new();
+    let mut keyword = BTreeMap::new();
 
     for ch in t.chunks(2) {
         // all_strings = all_strings && ch[0].is_string_like();
-        keyword.push((ch[0].clone(), ch[1].clone()));
+        keyword.insert(ch[0].clone(), ch[1].clone());
     }
 
     Ok((i, RawTerm::Map(keyword)))

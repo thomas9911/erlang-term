@@ -1,6 +1,7 @@
 use crate::consts::*;
 use crate::RawTerm;
 use num_bigint::{BigInt, Sign};
+use std::collections::BTreeMap;
 
 #[cfg(feature = "zlib")]
 use flate2::read::ZlibEncoder;
@@ -46,6 +47,7 @@ pub fn internal_to_binary(raw: RawTerm, add_prefix: bool) -> Vec<u8> {
         List(x) => list(x, add_prefix),
         Map(x) => map(x, add_prefix),
         Port { node, id, creation } => port(*node, id, creation, add_prefix),
+        NewPort { node, id, creation } => new_port(*node, id, creation, add_prefix),
         Ref { node, id, creation } => reference(*node, id, creation, add_prefix),
         NewerRef { node, id, creation } => newer_reference(*node, id, creation, add_prefix),
         Pid {
@@ -298,7 +300,7 @@ fn list(mut raw: Vec<RawTerm>, add_prefix: bool) -> Vec<u8> {
     buffer
 }
 
-fn map(raw: Vec<(RawTerm, RawTerm)>, add_prefix: bool) -> Vec<u8> {
+fn map(raw: BTreeMap<RawTerm, RawTerm>, add_prefix: bool) -> Vec<u8> {
     let arity = raw.len();
     let mut bytes: Vec<u8> = raw
         .into_iter()
@@ -333,6 +335,21 @@ fn port(node: RawTerm, id: u32, creation: u8, add_prefix: bool) -> Vec<u8> {
     buffer.extend(node_binary);
     buffer.extend(&(id as u32).to_be_bytes());
     buffer.push(creation);
+    buffer
+}
+
+fn new_port(node: RawTerm, id: u32, creation: u32, add_prefix: bool) -> Vec<u8> {
+    let node_binary = internal_to_binary(node, false);
+
+    let mut buffer = Vec::with_capacity(node_binary.len() + 7);
+
+    if add_prefix {
+        push_prefix(&mut buffer)
+    };
+    buffer.push(NEW_PORT_EXT);
+    buffer.extend(node_binary);
+    buffer.extend(&(id as u32).to_be_bytes());
+    buffer.extend(creation.to_be_bytes());
     buffer
 }
 
@@ -606,16 +623,20 @@ mod binary_tests {
 
     #[test]
     fn atom_map() {
-        let out = to_bytes(RawTerm::Map(vec![
-            (
-                RawTerm::AtomDeprecated("other".to_string()),
-                RawTerm::Binary(b"test".to_vec()),
-            ),
-            (
-                RawTerm::AtomDeprecated("some".to_string()),
-                RawTerm::SmallInt(3),
-            ),
-        ]));
+        let out = to_bytes(RawTerm::Map(
+            vec![
+                (
+                    RawTerm::AtomDeprecated("other".to_string()),
+                    RawTerm::Binary(b"test".to_vec()),
+                ),
+                (
+                    RawTerm::AtomDeprecated("some".to_string()),
+                    RawTerm::SmallInt(3),
+                ),
+            ]
+            .into_iter()
+            .collect(),
+        ));
 
         assert_eq!(
             out,
@@ -638,7 +659,9 @@ mod binary_tests {
                     Map(vec![(
                         AtomDeprecated("test".to_string()),
                         AtomDeprecated("false".to_string()),
-                    )]),
+                    )]
+                    .into_iter()
+                    .collect()),
                 ]),
             ),
             (Binary(b"float".to_vec()), Float(3.14)),
@@ -648,28 +671,30 @@ mod binary_tests {
             ),
             (
                 Binary(b"nested".to_vec()),
-                Map(vec![(Binary(b"ok".to_vec()), Nil)]),
+                Map(vec![(Binary(b"ok".to_vec()), Nil)].into_iter().collect()),
             ),
             (
                 AtomDeprecated("tuple".to_string()),
                 SmallTuple(vec![SmallInt(1), AtomDeprecated("more".to_string())]),
             ),
-        ];
-        dbg!(&map);
+        ]
+        .into_iter()
+        .collect();
+
         let out = to_bytes(RawTerm::Map(map));
 
         assert_eq!(
             out,
             vec![
-                REVISION, 116, 0, 0, 0, 6, 97, 1, 109, 0, 0, 0, 3, 111, 110, 101, 108, 0, 0, 0, 1,
+                REVISION, 116, 0, 0, 0, 6, 97, 1, 109, 0, 0, 0, 3, 111, 110, 101, 100, 0, 5, 116,
+                117, 112, 108, 101, 104, 2, 97, 1, 100, 0, 4, 109, 111, 114, 101, 108, 0, 0, 0, 1,
                 109, 0, 0, 0, 13, 108, 105, 115, 116, 32, 97, 115, 32, 97, 32, 107, 101, 121, 106,
                 108, 0, 0, 0, 2, 109, 0, 0, 0, 7, 97, 110, 111, 116, 104, 101, 114, 116, 0, 0, 0,
                 1, 100, 0, 4, 116, 101, 115, 116, 100, 0, 5, 102, 97, 108, 115, 101, 106, 109, 0,
                 0, 0, 5, 102, 108, 111, 97, 116, 70, 64, 9, 30, 184, 81, 235, 133, 31, 109, 0, 0,
                 0, 5, 108, 97, 114, 103, 101, 110, 8, 0, 21, 95, 208, 172, 75, 155, 182, 1, 109, 0,
                 0, 0, 6, 110, 101, 115, 116, 101, 100, 116, 0, 0, 0, 1, 109, 0, 0, 0, 2, 111, 107,
-                106, 100, 0, 5, 116, 117, 112, 108, 101, 104, 2, 97, 1, 100, 0, 4, 109, 111, 114,
-                101
+                106
             ]
         );
     }
@@ -687,6 +712,23 @@ mod binary_tests {
             vec![
                 REVISION, 102, 119, 19, 115, 111, 109, 101, 116, 104, 105, 110, 103, 64, 115, 111,
                 109, 101, 116, 104, 105, 110, 103, 0, 0, 0, 123, 2
+            ]
+        )
+    }
+
+    #[test]
+    fn new_port() {
+        let out = to_bytes(RawTerm::NewPort {
+            node: Box::new(RawTerm::SmallAtom("something@something".to_string())),
+            id: 123,
+            creation: 2,
+        });
+
+        assert_eq!(
+            out,
+            vec![
+                REVISION, 89, 119, 19, 115, 111, 109, 101, 116, 104, 105, 110, 103, 64, 115, 111,
+                109, 101, 116, 104, 105, 110, 103, 0, 0, 0, 123, 0, 0, 0, 2
             ]
         )
     }

@@ -14,7 +14,6 @@ use nom::sequence::{preceded, tuple};
 use nom::{Err as NomErr, IResult};
 use num_bigint::{BigInt, Sign};
 
-use std::collections::BTreeMap;
 use std::convert::TryInto;
 
 pub fn from_bytes(input: &[u8]) -> Result<RawTerm, NomErr<Error<&[u8]>>> {
@@ -379,11 +378,11 @@ fn map(input: &[u8]) -> IResult<&[u8], RawTerm> {
 
     let (i, t) = many_m_n(2 * length, 2 * length, term)(i)?;
 
-    let mut keyword = BTreeMap::new();
+    let mut keyword = Vec::new();
 
     for ch in t.chunks(2) {
         // all_strings = all_strings && ch[0].is_string_like();
-        keyword.insert(ch[0].clone(), ch[1].clone());
+        keyword.push((ch[0].clone(), ch[1].clone()));
     }
 
     Ok((i, RawTerm::Map(keyword)))

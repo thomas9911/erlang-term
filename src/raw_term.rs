@@ -3,7 +3,7 @@ use keylist::Keylist;
 use nom::error::Error;
 use nom::Err as NomErr;
 use num_bigint::BigInt;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use strum::EnumDiscriminants;
 
 #[derive(Debug, Clone, PartialEq, EnumDiscriminants)]
@@ -18,8 +18,7 @@ pub enum RawTerm {
     // NEW_PID,
     SmallTuple(Vec<RawTerm>),
     LargeTuple(Vec<RawTerm>),
-    // Map(Vec<(RawTerm, RawTerm)>),
-    Map(BTreeMap<RawTerm, RawTerm>),
+    Map(Vec<(RawTerm, RawTerm)>),
     Nil,
     String(Vec<u8>),
     List(Vec<RawTerm>),
@@ -536,16 +535,16 @@ mod from_term_tests {
         let input = read_binary("bins/atom_map.bin").unwrap();
         let out = from_bytes(&input).unwrap();
 
-        let mut map = std::collections::BTreeMap::new();
+        let mut map = Vec::new();
 
-        map.insert(
+        map.push((
             RawTerm::AtomDeprecated("just".to_string()),
             RawTerm::Binary(b"some key".to_vec()),
-        );
-        map.insert(
+        ));
+        map.push((
             RawTerm::AtomDeprecated("other".to_string()),
             RawTerm::Binary(b"value".to_vec()),
-        );
+        ));
 
         assert_eq!(RawTerm::Map(map), out);
     }
@@ -589,7 +588,7 @@ mod from_term_tests {
                 if let Some(index) =
                     map.iter()
                         .enumerate()
-                        .find_map(|(i, (x, y))| if (x, y) == item { Some(i) } else { None })
+                        .find_map(|(i, x)| if x == item { Some(i) } else { None })
                 {
                     map.remove(index);
                 } else {

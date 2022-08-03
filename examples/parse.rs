@@ -1,6 +1,5 @@
 use erlang_term::Term;
 
-
 const HELP_TEXT: &'static str = r###"parse elixir binary to Term
 
 example: 

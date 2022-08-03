@@ -14,6 +14,7 @@ defmodule TermGenerator do
         save(true, "true")
         save([], "empty_list")
         save("just some text", "small_string")
+        save(<<143, 45, 211, 57, 243, 220, 73, 235, 239, 201, 232, 189, 101>>, "non_utf8_string")
         save(<<1,2,3,4>>, "binary")
         # save_large_string("large_string")
         save(12.515, "float")

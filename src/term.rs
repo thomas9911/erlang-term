@@ -45,13 +45,11 @@ impl From<RawTerm> for Term {
             SmallInt(x) => Byte(x),
             RawTerm::Int(x) => Term::Int(x),
             RawTerm::Float(x) => Term::Float(x),
-            Binary(x) => {
-                if x.iter().all(|x| x > &31) {
-                    Term::String(std::string::String::from_utf8(x).expect("invalid utf8"))
-                } else {
-                    Bytes(x)
-                }
-            }
+            Binary(x) if is_string_printable(&x) => match std::str::from_utf8(&x) {
+                Ok(s) => Term::String(s.to_string()),
+                Err(_) => Bytes(x),
+            },
+            Binary(x) => Bytes(x),
             RawTerm::String(x) => Charlist(x),
             SmallBigInt(x) => BigInt(x),
             LargeBigInt(x) => BigInt(x),
@@ -89,6 +87,29 @@ impl From<RawTerm> for Term {
             x => Other(x),
         }
     }
+}
+
+fn is_string_printable(binary: &[u8]) -> bool {
+    binary.iter().all(is_string_printable_byte)
+}
+
+fn is_string_printable_byte(byte: &u8) -> bool {
+    // elixir 0xA0..0xD7FF
+    // let the String::from_utf8 check if it is a valid utf8 string
+    if byte >= &0xA0 {
+        return true;
+    }
+
+    // '\n\r\t\v\b\f\e\d\a'
+    if [10, 13, 9, 11, 8, 12, 27, 127, 7].contains(byte) {
+        return true;
+    }
+    // elixir 0x20..0x7E
+    if (0x20..=0x7E).contains(byte) {
+        return true;
+    }
+
+    false
 }
 
 fn raw_term_list_to_term_list(raw_list: Vec<RawTerm>) -> Vec<Term> {
@@ -498,6 +519,27 @@ impl_from_big_integer!(u64);
 impl_from_big_integer!(i128);
 impl_from_big_integer!(u128);
 
+#[test]
+fn is_string_printable_test() {
+    let data = &[7, 33, 125];
+    assert!(is_string_printable(data));
+    assert!(std::str::from_utf8(data).is_ok());
+
+    let data = &[194, 160];
+    assert!(is_string_printable(data));
+    assert!(std::str::from_utf8(data).is_ok());
+
+    // utf8 but still invalid according this function
+    let data = &[1, 2, 3, 4];
+    assert!(!is_string_printable(data));
+    assert!(std::str::from_utf8(data).is_ok());
+
+    // not utf8 but still valid according this function
+    let data = &[202, 218, 82, 75, 227, 11, 203, 41, 103, 208, 244, 215];
+    assert!(is_string_printable(data));
+    assert!(std::str::from_utf8(data).is_err())
+}
+
 #[cfg(test)]
 mod convert_tests {
     use crate::{from_bytes, read_binary, RawTerm, Term};
@@ -541,6 +583,34 @@ mod convert_tests {
         let out = from_bytes(&input).unwrap();
 
         assert_eq!(Bytes(vec![1, 2, 3, 4]), Term::from(out));
+    }
+
+    #[test]
+    fn binary_non_utf8() {
+        use crate::Term::*;
+
+        let input = read_binary("bins/non_utf8_string.bin").unwrap();
+        let out = from_bytes(&input).unwrap();
+
+        assert_eq!(
+            Bytes(vec![
+                143, 45, 211, 57, 243, 220, 73, 235, 239, 201, 232, 189, 101
+            ]),
+            Term::from(out)
+        );
+    }
+
+    #[test]
+    fn binary_utf8() {
+        use crate::Term::*;
+
+        let input = read_binary("bins/small_string.bin").unwrap();
+        let out = from_bytes(&input).unwrap();
+
+        assert_eq!(
+            String(std::string::String::from("just some text")),
+            Term::from(out)
+        );
     }
 
     #[test]

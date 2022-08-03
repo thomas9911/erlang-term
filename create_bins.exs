@@ -14,6 +14,7 @@ defmodule TermGenerator do
         save(true, "true")
         save([], "empty_list")
         save("just some text", "small_string")
+        save(<<143, 45, 211, 57, 243, 220, 73, 235, 239, 201, 232, 189, 101>>, "non_utf8_string")
         save(<<1,2,3,4>>, "binary")
         # save_large_string("large_string")
         save(12.515, "float")
@@ -36,6 +37,7 @@ defmodule TermGenerator do
         save({"test", "testing"}, "tuple")
         save(123456789123456789123456789, "small_big_int")
         save(Exp.exp(999,999), "large_big_int")
+        save({:row_data, "kkk", List.to_tuple(Enum.to_list(1..400)), 10}, "large_tuple")
         # save(&testing/2, "function")
         # save(self(), "pid")
 

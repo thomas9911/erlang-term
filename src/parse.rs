@@ -363,7 +363,7 @@ fn int(input: &[u8]) -> IResult<&[u8], RawTerm> {
 fn float(input: &[u8]) -> IResult<&[u8], RawTerm> {
     let (i, t) = preceded(tag(&[NEW_FLOAT_EXT]), take(8usize))(input)?;
     let new_float: [u8; 8] = t.try_into().unwrap();
-    Ok((i, RawTerm::Float(f64::from_be_bytes(new_float))))
+    Ok((i, RawTerm::Float(f64::from_be_bytes(new_float).into())))
 }
 
 fn empty_list(input: &[u8]) -> IResult<&[u8], RawTerm> {

@@ -1,30 +1,35 @@
 use crate::raw_term::{RawTermGeneralType, RawTermType};
 use crate::RawTerm;
+use crate::Term;
 
 use std::cmp::{Ord, Ordering};
 
 use num_bigint::BigInt;
 
-// impl Ord for Term {
-//     fn cmp(&self, other: &Self) -> Ordering {
-//         if self == other {
-//             return Ordering::Equal
-//         }
+impl Eq for Term {}
 
-//     }
-// }
+impl Ord for Term {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).expect("total order not found")
+    }
+}
 
-// #[test]
-// fn xd() {
-//     let x = vec![1, 2] > vec![1, 1, 1];
-//     dbg!(x);
+impl PartialOrd for Term {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self == other {
+            return Some(Ordering::Equal);
+        }
 
-//     let x = vec![1, 2] < vec![1, 1, 1];
+        let left_type = self.as_general_type();
+        let right_type = other.as_general_type();
 
-//     dbg!(x);
+        if left_type != right_type {
+            return left_type.partial_cmp(&right_type);
+        }
 
-//     panic!()
-// }
+        RawTerm::from(self.clone()).partial_cmp(&RawTerm::from(other.clone()))
+    }
+}
 
 impl RawTermType {
     ///
@@ -62,10 +67,6 @@ impl PartialOrd for RawTerm {
         if left_type != right_type {
             return left_type.partial_cmp(&right_type);
         }
-
-        // if left_type == RawTermGeneralType::Atom {
-        //     return atom_cmp(self, other).or_else(|| atom_cmp(other, self).map(Ordering::reverse));
-        // }
 
         match left_type {
             RawTermGeneralType::Atom => {
@@ -397,73 +398,6 @@ fn func_cmp(left: &RawTerm, right: &RawTerm) -> Option<Ordering> {
     }
 }
 
-// fn part(left: &RawTerm, right: &RawTerm) -> Option<Ordering> {
-//     use RawTerm::*;
-
-//     match (left, right) {
-//         (SmallInt(a), SmallInt(b)) => None,
-//         (Int(a), Int(b)) => None,
-//         (Float(a), Float(b)) => None,
-//         (SmallBigInt(a), SmallBigInt(b)) => None,
-//         (LargeBigInt(a), LargeBigInt(b)) => None,
-
-//         (SmallTuple(a), SmallTuple(b)) => None,
-//         (LargeTuple(a), LargeTuple(b)) => None,
-
-//         (Map(a), Map(b)) => None,
-
-//         (String(a), String(b)) => None,
-
-//         (List(a), List(b)) => None,
-//         (Improper(a), Improper(b)) => None,
-//         (Binary(a), Binary(b)) => None,
-
-//         (Pid { id: a, .. }, Pid { id: b, .. }) => a.partial_cmp(b),
-//         (Pid { id: a, .. }, NewPid { id: b, .. }) => a.partial_cmp(b),
-//         (NewPid { id: a, .. }, Pid { id: b, .. }) => a.partial_cmp(b),
-//         (NewPid { id: a, .. }, NewPid { id: b, .. }) => a.partial_cmp(b),
-
-//         (Atom(a), Atom(b)) => a.partial_cmp(b),
-//         (Atom(a), SmallAtom(b)) => a.partial_cmp(b),
-//         (Atom(a), AtomDeprecated(b)) => a.partial_cmp(b),
-//         (Atom(a), SmallAtomDeprecated(b)) => a.partial_cmp(b),
-//         (SmallAtom(a), Atom(b)) => a.partial_cmp(b),
-//         (SmallAtom(a), SmallAtom(b)) => a.partial_cmp(b),
-//         (SmallAtom(a), AtomDeprecated(b)) => a.partial_cmp(b),
-//         (SmallAtom(a), SmallAtomDeprecated(b)) => a.partial_cmp(b),
-//         (AtomDeprecated(a), Atom(b)) => a.partial_cmp(b),
-//         (AtomDeprecated(a), SmallAtom(b)) => a.partial_cmp(b),
-//         (AtomDeprecated(a), AtomDeprecated(b)) => a.partial_cmp(b),
-//         (AtomDeprecated(a), SmallAtomDeprecated(b)) => a.partial_cmp(b),
-//         (SmallAtomDeprecated(a), Atom(b)) => a.partial_cmp(b),
-//         (SmallAtomDeprecated(a), SmallAtom(b)) => a.partial_cmp(b),
-//         (SmallAtomDeprecated(a), AtomDeprecated(b)) => a.partial_cmp(b),
-//         (SmallAtomDeprecated(a), SmallAtomDeprecated(b)) => a.partial_cmp(b),
-
-//         _ => None,
-//     }
-// }
-
-// #[test]
-// fn xd() {
-//     let bytes = [
-//         131, 88, 100, 0, 13, 110, 111, 110, 111, 100, 101, 64, 110, 111, 104, 111, 115, 116, 0, 0,
-//         0, 110, 0, 0, 0, 1, 0, 0, 0, 0,
-//     ];
-//     let term = RawTerm::from_bytes(&bytes);
-
-//     dbg!(term);
-
-//     // dbg!(1.partial_cmp(&0));
-//     // dbg!(u8::MIN);
-//     // dbg!((1, 3usize, 1).partial_cmp(&(1, 3usize, 0)));
-//     // let a = RawTerm::NewPid{creation: 1, id: 2, serial: 3, node: Box::new(RawTerm::AtomDeprecated("test".to_string()))};
-//     // let b = RawTerm::Pid{creation: 1, id: 2, serial: 4, node: Box::new(RawTerm::AtomDeprecated("test".to_string()))};
-//     // dbg!(a.partial_cmp(&b));
-
-//     panic!()
-// }
-
 #[test]
 fn compare_pids() {
     let a = RawTerm::NewPid {
@@ -498,8 +432,6 @@ fn compare_pids() {
 
 #[test]
 fn ordering_test() {
-    // (RawTerm::Int(2), RawTerm::List(vec![RawTerm::Binary]))
-
     let mut map = std::collections::BTreeMap::new();
 
     map.insert(

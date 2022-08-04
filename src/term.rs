@@ -1,10 +1,13 @@
+use crate::raw_term::{RawTermGeneralType, RawTermType};
 use crate::RawTerm;
 
 use keylist::Keylist;
 use nom::error::Error;
 use nom::Err as NomErr;
 use num_bigint::BigInt;
+use ordered_float::OrderedFloat;
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
 
 mod improper_list;
@@ -18,7 +21,7 @@ pub use improper_list::ImproperList;
 pub enum Term {
     Byte(u8),
     Int(i32),
-    Float(f64),
+    Float(OrderedFloat<f64>),
     String(String),
     Atom(String),
     Bytes(Vec<u8>),
@@ -26,11 +29,10 @@ pub enum Term {
     Nil,
     BigInt(BigInt),
     Charlist(Vec<u8>),
-    Map(HashMap<String, Term>),
+    Map(HashMap<Term, Term>),
     Keyword(Keylist<String, Term>),
     List(Vec<Term>),
     Tuple(Vec<Term>),
-    MapArbitrary(Keylist<Term, Term>),
     Other(RawTerm),
 }
 
@@ -72,19 +74,47 @@ impl From<RawTerm> for Term {
             SmallAtomDeprecated(x) => atom_to_term(x),
             SmallAtom(x) => atom_to_term(x),
             RawTerm::Atom(x) => atom_to_term(x),
-            RawTerm::Map(x) if term.is_string_map() => {
-                let map = HashMap::from_iter(
-                    x.into_iter()
-                        .map(|(a, b)| (a.as_string_like().unwrap(), Term::from(b))),
-                );
-                Term::Map(map)
-            }
-            RawTerm::Map(x) => MapArbitrary(
+            RawTerm::Map(x) => Term::Map(
                 x.into_iter()
                     .map(|(a, b)| (Term::from(a), Term::from(b)))
                     .collect(),
             ),
             x => Other(x),
+        }
+    }
+}
+
+impl Hash for Term {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        use Term::*;
+
+        match self {
+            Byte(x) => x.hash(state),
+            Int(x) => x.hash(state),
+            Float(x) => x.hash(state),
+            String(x) => x.hash(state),
+            Atom(x) => x.hash(state),
+            Bytes(x) => x.hash(state),
+            Bool(x) => x.hash(state),
+            Nil => ().hash(state),
+            BigInt(x) => x.hash(state),
+            Charlist(x) => x.hash(state),
+            Map(x) => {
+                // copied from https://github.com/rust-lang/rust/pull/48366
+                state.write_u64(
+                    x.iter()
+                        .map(|kv| {
+                            let mut h = std::collections::hash_map::DefaultHasher::new();
+                            kv.hash(&mut h);
+                            h.finish()
+                        })
+                        .fold(0, u64::wrapping_add),
+                )
+            }
+            Keyword(x) => x.hash(state),
+            List(x) => x.hash(state),
+            Tuple(x) => x.hash(state),
+            Other(x) => x.hash(state),
         }
     }
 }
@@ -184,16 +214,6 @@ pub fn print_elixir_term(term: &Term) -> String {
         Map(m) => {
             let list: Vec<_> = m
                 .iter()
-                .map(|(k, v)| format!("{:?} => {}", k, print_elixir_term(v)))
-                .collect();
-            let mut inner = list.join(", ");
-            inner.insert_str(0, "%{");
-            inner.push('}');
-            inner
-        }
-        MapArbitrary(m) => {
-            let list: Vec<_> = m
-                .iter()
                 .map(|(k, v)| format!("{} => {}", print_elixir_term(k), print_elixir_term(v)))
                 .collect();
             let mut inner = list.join(", ");
@@ -234,6 +254,30 @@ impl Term {
         RawTerm::from(self).to_gzip_bytes(level)
     }
 
+    pub fn as_type(&self) -> RawTermType {
+        match self {
+            Term::Byte(_) => RawTermType::SmallInt,
+            Term::Int(_) => RawTermType::Int,
+            Term::Float(_) => RawTermType::Float,
+            Term::String(_) => RawTermType::Binary,
+            Term::Atom(_) => RawTermType::Atom,
+            Term::Bytes(_) => RawTermType::Binary,
+            Term::Bool(_) => RawTermType::SmallAtom,
+            Term::Nil => RawTermType::SmallAtom,
+            Term::BigInt(_) => RawTermType::LargeBigInt,
+            Term::Charlist(_) => RawTermType::String,
+            Term::Map(_) => RawTermType::Map,
+            Term::Keyword(_) => RawTermType::List,
+            Term::List(_) => RawTermType::List,
+            Term::Tuple(_) => RawTermType::LargeTuple,
+            Term::Other(x) => x.as_type(),
+        }
+    }
+
+    pub fn as_general_type(&self) -> RawTermGeneralType {
+        RawTermGeneralType::from(self.as_type())
+    }
+
     pub fn is_byte(&self) -> bool {
         use Term::*;
         match self {
@@ -246,6 +290,14 @@ impl Term {
         use Term::*;
         match self {
             String(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_atom(&self) -> bool {
+        use Term::*;
+        match self {
+            Atom(_) => true,
             _ => false,
         }
     }
@@ -315,7 +367,7 @@ impl Term {
     pub fn as_float(self) -> Option<f64> {
         use Term::*;
         match self {
-            Float(x) => Some(x),
+            Float(x) => Some(*x),
             _ => None,
         }
     }
@@ -381,7 +433,7 @@ impl Term {
         }
     }
 
-    pub fn as_map(self) -> Option<HashMap<String, Term>> {
+    pub fn as_map(self) -> Option<HashMap<Term, Term>> {
         use Term::*;
         match self {
             Map(x) => Some(x),
@@ -389,10 +441,30 @@ impl Term {
         }
     }
 
-    pub fn as_map_arbitrary(self) -> Option<Keylist<Term, Term>> {
+    pub fn as_string_map(self) -> Option<HashMap<String, Term>> {
         use Term::*;
         match self {
-            MapArbitrary(x) => Some(x),
+            Map(x) if x.keys().all(|y| y.is_string()) => {
+                let new_map = HashMap::from_iter(
+                    x.into_iter()
+                        .map(|(k, v)| (k.as_string().expect("checked this in the match"), v)),
+                );
+                Some(new_map)
+            }
+            _ => None,
+        }
+    }
+
+    pub fn as_atom_map(self) -> Option<HashMap<String, Term>> {
+        use Term::*;
+        match self {
+            Map(x) if x.keys().all(|y| y.is_atom()) => {
+                let new_map = HashMap::from_iter(
+                    x.into_iter()
+                        .map(|(k, v)| (k.as_atom().expect("checked this in the match"), v)),
+                );
+                Some(new_map)
+            }
             _ => None,
         }
     }
@@ -402,7 +474,7 @@ macro_rules! impl_from_float {
     ($type: ty) => {
         impl From<$type> for Term {
             fn from(input: $type) -> Term {
-                Term::Float(input as f64)
+                Term::Float((input as f64).into())
             }
         }
     };
@@ -483,7 +555,7 @@ impl<T: Into<Term>> From<Vec<T>> for Term {
                     .map(|(a, b)| (a.as_string().unwrap(), b)),
             ))
         } else if data.iter().all(|x| x.is_pair_tuple()) {
-            Term::MapArbitrary(Keylist::from_iter(
+            Term::Map(HashMap::from_iter(
                 data.into_iter()
                     .map(|x| x.as_tuple().unwrap())
                     .map(|mut x| {
@@ -498,10 +570,10 @@ impl<T: Into<Term>> From<Vec<T>> for Term {
     }
 }
 
-impl<K: ToString, V: Into<Term>> From<HashMap<K, V>> for Term {
+impl<K: Into<Term>, V: Into<Term>> From<HashMap<K, V>> for Term {
     fn from(input: HashMap<K, V>) -> Term {
         Term::Map(HashMap::from_iter(
-            input.into_iter().map(|(k, v)| (k.to_string(), v.into())),
+            input.into_iter().map(|(k, v)| (k.into(), v.into())),
         ))
     }
 }
@@ -632,8 +704,14 @@ mod convert_tests {
         let out = from_bytes(&input).unwrap();
 
         let mut expected = HashMap::new();
-        expected.insert("just".to_string(), Term::String("some key".to_string()));
-        expected.insert("other".to_string(), Term::String("value".to_string()));
+        expected.insert(
+            Term::Atom("just".to_string()),
+            Term::String("some key".to_string()),
+        );
+        expected.insert(
+            Term::Atom("other".to_string()),
+            Term::String("value".to_string()),
+        );
 
         assert_eq!(Term::Map(expected), Term::from(out));
     }
@@ -646,11 +724,11 @@ mod convert_tests {
         let out = from_bytes(&input).unwrap();
 
         let mut sub = HashMap::new();
-        sub.insert("test".to_string(), Term::Bool(false));
+        sub.insert(Term::Atom("test".to_string()), Term::Bool(false));
         let mut nested = HashMap::new();
-        nested.insert("ok".to_string(), Term::List(Vec::new()));
+        nested.insert(Term::String("ok".to_string()), Term::List(Vec::new()));
 
-        let expected = Keylist::from_iter(vec![
+        let expected = HashMap::from_iter(vec![
             (Term::Byte(1), Term::String("one".to_string())),
             (
                 Term::Atom("tuple".to_string()),
@@ -660,7 +738,7 @@ mod convert_tests {
                 Term::List(vec![Term::String("list as a key".to_string())]),
                 Term::List(vec![Term::String("another".to_string()), Term::Map(sub)]),
             ),
-            (Term::String("float".to_string()), Term::Float(3.14)),
+            (Term::String("float".to_string()), Term::Float(3.14.into())),
             (
                 Term::String("large".to_string()),
                 Term::BigInt(BigInt::parse_bytes(b"123456789123456789", 10).unwrap()),
@@ -668,7 +746,7 @@ mod convert_tests {
             (Term::String("nested".to_string()), Term::Map(nested)),
         ]);
 
-        assert_eq!(Term::MapArbitrary(expected), Term::from(out));
+        assert_eq!(Term::Map(expected), Term::from(out));
     }
 
     #[test]
@@ -695,6 +773,8 @@ mod from_tests {
     use crate::Term;
     use keylist::Keylist;
     use num_bigint::BigInt;
+    use std::collections::HashMap;
+    use std::iter::FromIterator;
 
     #[test]
     fn from_i32() {
@@ -746,7 +826,7 @@ mod from_tests {
     fn from_list_keyword_to_map() {
         use Term::*;
         let input = vec![(vec!["test"], 12), (vec!["testing"], 129)];
-        let expected = Term::MapArbitrary(Keylist::from(vec![
+        let expected = Term::Map(HashMap::from_iter(vec![
             (List(vec!["test".into()]), 12.into()),
             (List(vec!["testing".into()]), 129.into()),
         ]));
@@ -782,8 +862,8 @@ mod from_tests {
 
         assert_eq!(
             Term::Map(HashMap::from_iter(vec![
-                (String::from("1"), "test".into()),
-                (String::from("5"), "testing".into())
+                (1u8.into(), "test".into()),
+                (5u8.into(), "testing".into())
             ])),
             map.into()
         );
@@ -844,7 +924,7 @@ mod print {
             "[1, 2, 3, 4, 5, 6, 7]",
             print_elixir_term(&Term::Charlist(vec![1, 2, 3, 4, 5, 6, 7]))
         );
-        assert_eq!("3.123124123123123", print_elixir_term(&Term::Float(3.12312412312312323546888848456546565516164651884446584621651658468222541315465468542651)));
+        assert_eq!("3.123124123123123", print_elixir_term(&Term::Float(3.12312412312312323546888848456546565516164651884446584621651658468222541315465468542651.into())));
         assert_eq!("123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789", print_elixir_term(&Term::BigInt(BigInt::parse_bytes(b"123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789", 10).unwrap())));
         let keylist: Keylist<String, Term> = Keylist::from_iter(vec![
             ("test".into(), 1.into()),
@@ -875,7 +955,7 @@ mod print {
             r#"{"hallo", 123, nil, <<1, 2, 3, 4, 5, 6, 7>>}"#,
             print_elixir_term(&Term::Tuple(list))
         );
-        let map: HashMap<String, Term> = HashMap::from_iter(vec![
+        let map: HashMap<Term, Term> = HashMap::from_iter(vec![
             ("test".into(), 1.into()),
             ("Test".into(), 2.into()),
             ("1234Test".into(), 3.into()),
@@ -886,12 +966,12 @@ mod print {
         assert!(map_text.contains("%{"));
         assert!(map_text.contains(r#""1234Test" => 3"#));
 
-        let map = Keylist::from(vec![
+        let map = HashMap::from_iter(vec![
             (Term::List(vec!["test".into()]), 12.into()),
             (Term::List(vec!["testing".into()]), 129.into()),
         ]);
 
-        let map_text = print_elixir_term(&Term::MapArbitrary(map));
+        let map_text = print_elixir_term(&Term::Map(map));
         assert!(map_text.contains(r#"["test"] => 12"#));
         assert!(map_text.contains(r#"["testing"] => 129"#));
         assert!(map_text.contains("%{"));

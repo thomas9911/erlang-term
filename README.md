@@ -2,7 +2,6 @@
 
 Library to convert Erlang External Term Format to Rust objects, without using erlang NIFs.
 
-
 ```sh
 elixir -e ":erlang.term_to_binary([1,2,3,4]) |> IO.inspect()" | sed -e 's/<</[/g' | sed -e 's/>>/]/g'
 ```
@@ -18,6 +17,7 @@ assert_eq!(Ok(Term::Charlist([1, 2, 3, 4].to_vec())), term);
 ```
 
 Or if you want more controle over the external term format:
+
 ```rust
 use erlang_term::RawTerm;
 
@@ -46,7 +46,7 @@ use std::iter::FromIterator;
 let map = RawTerm::Map(vec![
     (RawTerm::SmallAtom(String::from("test")), RawTerm::SmallTuple(vec![RawTerm::SmallAtom(String::from("ok")), RawTerm::SmallInt(15)])),
     (RawTerm::SmallAtom(String::from("another_key")), RawTerm::Binary(b"this is a string".to_vec())),
-    (RawTerm::SmallAtom(String::from("number")), RawTerm::Float(3.1415)),
+    (RawTerm::SmallAtom(String::from("number")), RawTerm::Float(3.1415.into())),
 ]);
 
 let binary = vec![
@@ -56,3 +56,4 @@ let binary = vec![
 assert_eq!(map.to_bytes(), binary);
 ```
 
+License: Unlicense

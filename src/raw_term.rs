@@ -3,10 +3,11 @@ use keylist::Keylist;
 use nom::error::Error;
 use nom::Err as NomErr;
 use num_bigint::BigInt;
+use ordered_float::OrderedFloat;
 use std::collections::HashMap;
 use strum::EnumDiscriminants;
 
-#[derive(Debug, Clone, PartialEq, EnumDiscriminants)]
+#[derive(Debug, Clone, Hash, PartialEq, EnumDiscriminants)]
 #[strum_discriminants(name(RawTermType))]
 #[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
 pub enum RawTerm {
@@ -73,7 +74,7 @@ pub enum RawTerm {
     // FUN,
     // EXPORT,
     // BIT_BINARY,
-    Float(f64),
+    Float(OrderedFloat<f64>),
     Atom(String),
     SmallAtom(String),
     // REFERENCE_EXT_DEPRECATED,
@@ -210,11 +211,10 @@ impl From<Term> for RawTerm {
             Term::Nil => RawTerm::SmallAtom("nil".to_string()),
             Term::BigInt(x) => big_int_to_raw_term(x),
             Term::Charlist(x) => RawTerm::String(x),
-            Term::Map(x) => map_to_raw_term(x),
             Term::Keyword(x) => keyword_to_raw_term(x),
             Term::List(x) => list_to_raw_term(x),
             Term::Tuple(x) => tuple_to_raw_term(x),
-            Term::MapArbitrary(x) => map_arbitrary_to_raw_term(x),
+            Term::Map(x) => map_arbitrary_to_raw_term(x),
             Term::Other(x) => x,
         }
     }
@@ -232,18 +232,10 @@ fn keyword_to_raw_term(keyword: Keylist<String, Term>) -> RawTerm {
     RawTerm::List(tmp)
 }
 
-fn map_arbitrary_to_raw_term(map: Keylist<Term, Term>) -> RawTerm {
+fn map_arbitrary_to_raw_term(map: HashMap<Term, Term>) -> RawTerm {
     let tmp = map
         .into_iter()
         .map(|(k, v)| (RawTerm::from(k), RawTerm::from(v)))
-        .collect();
-    RawTerm::Map(tmp)
-}
-
-fn map_to_raw_term(map: HashMap<String, Term>) -> RawTerm {
-    let tmp = map
-        .into_iter()
-        .map(|(k, v)| (RawTerm::Binary(k.as_bytes().to_vec()), RawTerm::from(v)))
         .collect();
     RawTerm::Map(tmp)
 }
@@ -475,7 +467,7 @@ mod from_term_tests {
         let input = read_binary("bins/float.bin").unwrap();
         let out = from_bytes(&input).unwrap();
 
-        assert_eq!(RawTerm::Float(12.515), out);
+        assert_eq!(RawTerm::Float(12.515.into()), out);
     }
 
     #[test]
@@ -556,7 +548,7 @@ mod from_term_tests {
         let input = read_binary("bins/map.bin").unwrap();
         if let Map(out) = from_bytes(&input).unwrap() {
             let mut map = vec![
-                (Binary(b"float".to_vec()), Float(3.14)),
+                (Binary(b"float".to_vec()), Float(3.14.into())),
                 (
                     List(vec![Binary(b"list as a key".to_vec())]),
                     List(vec![
@@ -819,7 +811,7 @@ mod as_type_tests {
 
     #[test]
     fn as_type_float() {
-        let term = RawTerm::Float(0.123);
+        let term = RawTerm::Float(0.123.into());
 
         assert_eq!(RawTermType::Float, term.as_type())
     }

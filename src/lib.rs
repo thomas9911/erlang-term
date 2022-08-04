@@ -44,7 +44,7 @@
 //! let map = RawTerm::Map(vec![
 //!     (RawTerm::SmallAtom(String::from("test")), RawTerm::SmallTuple(vec![RawTerm::SmallAtom(String::from("ok")), RawTerm::SmallInt(15)])),    
 //!     (RawTerm::SmallAtom(String::from("another_key")), RawTerm::Binary(b"this is a string".to_vec())),
-//!     (RawTerm::SmallAtom(String::from("number")), RawTerm::Float(3.1415)),
+//!     (RawTerm::SmallAtom(String::from("number")), RawTerm::Float(3.1415.into())),
 //! ]);
 //!
 //! let binary = vec![

@@ -110,7 +110,7 @@ fn get_tail() {
 #[test]
 fn get_mut_tail() {
     let mut expected = std::collections::HashMap::new();
-    expected.insert(String::from("test"), Term::Int(16));
+    expected.insert(Term::from(String::from("test")), Term::Int(16));
 
     let mut list = ImproperList::from_parts(
         vec![Term::Int(123), Term::Int(124), Term::Int(125)],
@@ -120,7 +120,7 @@ fn get_mut_tail() {
     if let Some(tail) = list.get_mut_tail() {
         match tail {
             Term::Map(map) => {
-                map.insert(String::from("test"), Term::Int(16));
+                map.insert(Term::from(String::from("test")), Term::Int(16));
             }
             _ => unreachable!(),
         }

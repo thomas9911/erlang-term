@@ -33,7 +33,7 @@ pub fn internal_to_binary(raw: RawTerm, add_prefix: bool) -> Vec<u8> {
         SmallAtom(x) => small_atom(x, add_prefix),
         AtomDeprecated(x) => atom_deprecated(x, add_prefix),
         SmallAtomDeprecated(x) => small_atom_deprecated(x, add_prefix),
-        Float(x) => float(x, add_prefix),
+        Float(x) => float(*x, add_prefix),
         Nil => nil(add_prefix),
         SmallInt(x) => small_int(x, add_prefix),
         Int(x) => int(x, add_prefix),
@@ -504,7 +504,7 @@ mod binary_tests {
 
     #[test]
     fn float() {
-        let out = to_bytes(RawTerm::Float(3.14));
+        let out = to_bytes(RawTerm::Float(3.14.into()));
         assert_eq!(out, vec![REVISION, 70, 64, 9, 30, 184, 81, 235, 133, 31])
     }
 
@@ -663,7 +663,7 @@ mod binary_tests {
                     .collect()),
                 ]),
             ),
-            (Binary(b"float".to_vec()), Float(3.14)),
+            (Binary(b"float".to_vec()), Float(3.14.into())),
             (
                 Binary(b"large".to_vec()),
                 SmallBigInt(BigInt::parse_bytes(b"123456789123456789", 10).unwrap()),

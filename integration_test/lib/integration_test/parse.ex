@@ -8,7 +8,9 @@ defmodule IntegrationTest.Parse do
 
   def call_binary(term) do
     bin_path()
-    |> System.cmd([inspect(:erlang.term_to_binary(term), limit: :infinity, print_limit: :infinity)])
+    |> System.cmd([
+      inspect(:erlang.term_to_binary(term), limit: :infinity, print_limit: :infinity)
+    ])
     |> as_result()
   end
 

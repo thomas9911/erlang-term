@@ -1,3 +1,2 @@
 defmodule IntegrationTestTest do
-
 end

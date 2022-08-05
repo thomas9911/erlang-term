@@ -115,7 +115,6 @@ fn main() {
             if json_flag {
                 // print as json
                 let term = Term::from(filtered_data);
-                // println!("{}", serde_json::to_string_pretty(&term).unwrap())
                 print_json(term);
             } else {
                 // store the bytes

@@ -51,16 +51,19 @@ defmodule IntegrationTest.ParseTest do
     assert "Charlist([116, 101, 115, 116, 49, 50, 51])" == Parse.call_binary!('test123')
   end
 
-  property "works" do
+  property "term property" do
     check all term <- term() do
       assert {:ok, _} = Parse.call_binary(term)
     end
+  end
 
-    # # crashes
-    # check all term <- bitstring() do
-    #   assert {:ok, _} = Parse.call_binary(term)
-    # end
+  property "bitstring property" do
+    check all term <- bitstring() do
+      assert {:ok, _} = Parse.call_binary(term)
+    end
+  end
 
+  property "iolist property" do
     check all term <- iolist() do
       assert {:ok, _} = Parse.call_binary(term)
     end

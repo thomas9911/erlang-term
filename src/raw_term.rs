@@ -10,6 +10,7 @@ use strum::EnumDiscriminants;
 #[derive(Debug, Clone, Hash, PartialEq, EnumDiscriminants)]
 #[strum_discriminants(name(RawTermType))]
 #[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
+/// Erlang Term Format types
 pub enum RawTerm {
     // ATOM_CACHE_REF
     SmallInt(u8),
@@ -120,6 +121,7 @@ impl RawTerm {
         }
     }
 
+    /// if term is a string/binary or atom
     pub fn is_string_like(&self) -> bool {
         self.is_string() | self.is_atom()
     }
@@ -187,8 +189,8 @@ impl RawTerm {
         use RawTerm::*;
         match self {
             SmallTuple(mut x) | LargeTuple(mut x) if x.len() == 2 => {
-                let b = x.pop().unwrap();
-                if let Some(a) = x.pop().unwrap().as_atom() {
+                let b = x.pop().expect("length is two");
+                if let Some(a) = x.pop().expect("length is two").as_atom() {
                     return Some((a, b));
                 }
             }

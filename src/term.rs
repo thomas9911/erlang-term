@@ -18,6 +18,55 @@ pub use improper_list::ImproperList;
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde_impl", serde(untagged))]
+/// Higher level Elixir types
+///
+/// These can be created by using the `Term::from` methods or creating them directly.
+///
+/// ```rust
+/// # use erlang_term::Term;
+///
+/// let string = Term::from("ok");
+/// let atom = Term::Atom("ok".to_string());
+///
+/// assert!(string.is_string());
+/// assert!(atom.is_atom());
+/// assert_ne!(string, atom);
+/// ```
+///
+/// The `Term::as_*` will unwrap the Term into a specific type if the Term is that type
+///
+/// ```rust
+/// # use erlang_term::Term;
+///
+/// let atom = Term::Atom("ok".to_string());
+/// assert_eq!(Some("ok".to_string()), atom.as_atom());
+///
+/// let atom = Term::Atom("ok".to_string());
+/// assert_eq!(None, atom.as_string());
+/// ```
+///
+/// Convert to RawTerm
+///
+/// ```rust
+/// # use erlang_term::{Term, RawTerm};
+///
+/// let term = Term::from("testing");
+/// let raw_term = RawTerm::from(term);
+///
+/// assert_eq!(RawTerm::Binary(vec![116, 101, 115, 116, 105, 110, 103]), raw_term);
+/// ```
+///
+/// Convert from RawTerm
+///
+/// ```rust
+/// # use erlang_term::{Term, RawTerm};
+///
+/// let raw_term = RawTerm::Binary(vec![116, 101, 115, 116, 105, 110, 103]);
+/// let term = Term::from(raw_term);
+///
+/// assert_eq!(Some("testing".to_string()), term.as_string());
+/// ```
+///
 pub enum Term {
     Byte(u8),
     Int(i32),
@@ -310,6 +359,14 @@ impl Term {
         }
     }
 
+    ///
+    /// Check if the Term is a tuple of length 2
+    ///
+    /// ```rust
+    /// # use erlang_term::Term;
+    /// let term = Term::from((1, 2));
+    /// assert!(term.is_pair_tuple());
+    /// ```
     pub fn is_pair_tuple(&self) -> bool {
         use Term::*;
         match self {
@@ -326,6 +383,16 @@ impl Term {
         }
     }
 
+    ///
+    /// Check if the Term is of the form `("string", any)`
+    ///
+    /// ```rust
+    /// # use erlang_term::Term;
+    /// let term = Term::from(("test", 1));
+    /// assert!(term.is_string_tuple_pair());
+    /// let term = Term::from((1, 2));
+    /// assert!(!term.is_string_tuple_pair());
+    /// ```
     pub fn is_string_tuple_pair(&self) -> bool {
         use Term::*;
         match self {
@@ -441,6 +508,10 @@ impl Term {
         }
     }
 
+    ///
+    /// Unwrap and convert the term into a `HashMap<String, Term>` if the term is a map and all the keys are strings
+    /// Note that this will create a new map, so for one-offs you should use the `Term::as_map` function
+    ///
     pub fn as_string_map(self) -> Option<HashMap<String, Term>> {
         use Term::*;
         match self {
@@ -455,6 +526,10 @@ impl Term {
         }
     }
 
+    ///
+    /// Unwrap and convert the term into a `HashMap<String, Term>` if the term is a map and all the keys are atoms
+    /// Note that this will create a new map, so for one-offs you should use the `Term::as_map` function
+    ///
     pub fn as_atom_map(self) -> Option<HashMap<String, Term>> {
         use Term::*;
         match self {

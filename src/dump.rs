@@ -39,6 +39,7 @@ pub fn internal_to_binary(raw: RawTerm, add_prefix: bool) -> Vec<u8> {
         Int(x) => int(x, add_prefix),
         String(x) => string(x, add_prefix),
         Binary(x) => binary(x, add_prefix),
+        BitBinary { binary, bit, bits } => bitbinary(binary, bit, bits, add_prefix),
         SmallBigInt(x) => small_big_int(x, add_prefix),
         LargeBigInt(x) => large_big_int(x, add_prefix),
         SmallTuple(x) => small_tuple(x, add_prefix),
@@ -197,6 +198,22 @@ fn binary(mut raw: Vec<u8>, add_prefix: bool) -> Vec<u8> {
     buffer.push(BINARY_EXT);
     buffer.extend(&(length as u32).to_be_bytes());
     buffer.extend(raw.drain(..));
+    buffer
+}
+
+fn bitbinary(mut binary: Vec<u8>, bit: u8, bits: u8, add_prefix: bool) -> Vec<u8> {
+    let length = binary.len();
+    let mut buffer = Vec::with_capacity(length + 7);
+
+    if add_prefix {
+        push_prefix(&mut buffer)
+    };
+    buffer.push(BIT_BINARY_EXT);
+    buffer.extend(&((length as u32) + 1).to_be_bytes());
+    buffer.push(bits);
+    buffer.extend(binary.drain(..));
+    // do some magic here
+    buffer.push(bit << (8u8.saturating_sub(bits)));
     buffer
 }
 
@@ -545,6 +562,26 @@ mod binary_tests {
             out,
             vec![REVISION, 109, 0, 0, 0, 7, 116, 101, 115, 116, 105, 110, 103]
         )
+    }
+
+    #[test]
+    fn bitbinary() {
+        let out = to_bytes(RawTerm::BitBinary {
+            binary: b"testing".to_vec(),
+            bit: 13,
+            bits: 4,
+        });
+        assert_eq!(
+            out,
+            vec![REVISION, 77, 0, 0, 0, 8, 4, 116, 101, 115, 116, 105, 110, 103, 208]
+        );
+
+        let out = to_bytes(RawTerm::BitBinary {
+            binary: vec![95],
+            bit: 23,
+            bits: 5,
+        });
+        assert_eq!(out, vec![REVISION, 77, 0, 0, 0, 2, 5, 95, 184]);
     }
 
     #[test]

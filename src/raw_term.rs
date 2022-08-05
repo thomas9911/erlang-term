@@ -26,6 +26,11 @@ pub enum RawTerm {
     List(Vec<RawTerm>),
     Improper(Box<RawTerm>),
     Binary(Vec<u8>),
+    BitBinary {
+        binary: Vec<u8>,
+        bit: u8,
+        bits: u8,
+    },
     SmallBigInt(BigInt),
     LargeBigInt(BigInt),
     Pid {
@@ -314,6 +319,7 @@ impl From<&RawTermType> for RawTermGeneralType {
             List => RawTermGeneralType::List,
             Improper => RawTermGeneralType::Improper,
             Binary => RawTermGeneralType::BitString,
+            BitBinary => RawTermGeneralType::BitString,
             SmallBigInt => RawTermGeneralType::Number,
             LargeBigInt => RawTermGeneralType::Number,
             Pid => RawTermGeneralType::Pid,
@@ -450,6 +456,21 @@ mod from_term_tests {
         let out = from_bytes(&input).unwrap();
 
         assert_eq!(RawTerm::Binary(vec![1, 2, 3, 4]), out);
+    }
+
+    #[test]
+    fn bitbinary() {
+        let input = read_binary("bins/bitbinary.bin").unwrap();
+        let out = from_bytes(&input).unwrap();
+
+        assert_eq!(
+            RawTerm::BitBinary {
+                binary: vec![95],
+                bit: 23,
+                bits: 5
+            },
+            out
+        );
     }
 
     #[test]

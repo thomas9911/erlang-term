@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Support for the bitbinary type
+
 ## [1.0.0] - 05-08-22
 
 ### Added
@@ -23,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Deleted Term::MapArbitrary because normal Term::Map does the same
 
-## [0.2.4] - 04-04-22
+## [0.2.4] - 04-08-22
 
 ### Fixed
 

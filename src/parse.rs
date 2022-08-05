@@ -39,6 +39,7 @@ fn term(input: &[u8]) -> IResult<&[u8], RawTerm> {
         SMALL_ATOM_UTF8_EXT => (small_atom),
         NIL_EXT => (empty_list),
         BINARY_EXT => (binary),
+        BIT_BINARY_EXT => (bitstring),
         STRING_EXT => (string),
         LIST_EXT => (list),
         MAP_EXT => (map),
@@ -73,6 +74,7 @@ fn term(input: &[u8]) -> IResult<&[u8], RawTerm> {
         SMALL_ATOM_UTF8_EXT => (small_atom),
         NIL_EXT => (empty_list),
         BINARY_EXT => (binary),
+        BIT_BINARY_EXT => (bitstring),
         STRING_EXT => (string),
         LIST_EXT => (list),
         MAP_EXT => (map),
@@ -337,6 +339,26 @@ fn binary(input: &[u8]) -> IResult<&[u8], RawTerm> {
 
     let (i, t) = take(length)(i)?;
     Ok((i, RawTerm::Binary(t.to_vec())))
+}
+
+fn bitstring(input: &[u8]) -> IResult<&[u8], RawTerm> {
+    let (i, t) = preceded(tag(&[BIT_BINARY_EXT]), take(4usize))(input)?;
+    let binary_length = (slice_to_u32(t) as usize).saturating_sub(1);
+    let (i, t) = take(1usize)(i)?;
+    let bit_length = t[0];
+    let (i, binary_data) = take(binary_length)(i)?;
+    let (i, t) = take(1usize)(i)?;
+    let move_bits = 8u8.saturating_sub(bit_length);
+    let bit_data = t[0] >> move_bits;
+
+    Ok((
+        i,
+        RawTerm::BitBinary {
+            binary: binary_data.to_vec(),
+            bit: bit_data,
+            bits: bit_length,
+        },
+    ))
 }
 
 fn string(input: &[u8]) -> IResult<&[u8], RawTerm> {

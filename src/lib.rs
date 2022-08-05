@@ -1,14 +1,14 @@
 //! Library to convert Erlang External Term Format to Rust objects, without using erlang NIFs.
 //!
 //! # Installation
-//! 
+//!
 //! ```toml
 //! [dependencies]
 //! erlang-term = "1.0.0"
 //! ```
 //!
 //! # Usage
-//! 
+//!
 //! ```sh
 //! elixir -e ":erlang.term_to_binary([1,2,3,4]) |> IO.inspect()" | sed -e 's/<</[/g' | sed -e 's/>>/]/g'
 //! ```
@@ -24,7 +24,7 @@
 //! ```
 //!
 //! Or if you want more controle over the external term format:
-//! 
+//!
 //! ```
 //! use erlang_term::RawTerm;
 //!
@@ -84,10 +84,10 @@
 //! # Use Cases
 //!
 //! - Filter out non-data (such as references and functions) from stored etf files
-//! 
+//!
 //! - Convert stored etf files to json
 //!
-//! See the [filter example](./examples/filter.rs) 
+//! See the [filter example](./examples/filter.rs)
 //!
 
 // http://erlang.org/doc/apps/erts/erl_ext_dist.html#distribution-header

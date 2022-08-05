@@ -16,6 +16,7 @@ defmodule TermGenerator do
         save("just some text", "small_string")
         save(<<143, 45, 211, 57, 243, 220, 73, 235, 239, 201, 232, 189, 101>>, "non_utf8_string")
         save(<<1,2,3,4>>, "binary")
+        save(<<95, 23::5>>, "bitbinary")
         # save_large_string("large_string")
         save(12.515, "float")
         save(:oddţ, "odd_atom")

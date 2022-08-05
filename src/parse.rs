@@ -49,7 +49,9 @@ fn term(input: &[u8]) -> IResult<&[u8], RawTerm> {
         PID_EXT => (pid),
         NEW_PID_EXT => (new_pid),
         PORT_EXT => (port),
-        NEW_REFERENCE_EXT => (reference),
+        NEW_PORT_EXT => (new_port),
+        NEW_REFERENCE_EXT => (reference_new),
+        NEWER_REFERENCE_EXT => (reference_newer),
         NEW_FUN_EXT => (function),
         _ => {
             return Err(Err::Error(nom::error::Error::new(input, ErrorKind::NoneOf)));
@@ -81,7 +83,9 @@ fn term(input: &[u8]) -> IResult<&[u8], RawTerm> {
         PID_EXT => (pid),
         NEW_PID_EXT => (new_pid),
         PORT_EXT => (port),
-        NEW_REFERENCE_EXT => (reference),
+        NEW_PORT_EXT => (new_port),
+        NEW_REFERENCE_EXT => (reference_new),
+        NEWER_REFERENCE_EXT => (reference_newer),
         NEW_FUN_EXT => (function),
         ZLIB => (gzip),
         _ => {
@@ -221,7 +225,24 @@ fn port(input: &[u8]) -> IResult<&[u8], RawTerm> {
     ))
 }
 
-fn reference(input: &[u8]) -> IResult<&[u8], RawTerm> {
+fn new_port(input: &[u8]) -> IResult<&[u8], RawTerm> {
+    let get_data = tuple((node_or_module, take(4usize), take(4usize)));
+
+    let (i, (node, id, creation)) = preceded(tag(&[NEW_PORT_EXT]), get_data)(input)?;
+    let id = slice_to_u32(id);
+    let creation = slice_to_u32(creation);
+
+    Ok((
+        i,
+        RawTerm::NewPort {
+            node: Box::new(node),
+            id,
+            creation,
+        },
+    ))
+}
+
+fn reference_new(input: &[u8]) -> IResult<&[u8], RawTerm> {
     let get_data = tuple((take(2usize), node_or_module, take(1usize)));
     let (i, (length, node, creation)) = preceded(tag(&[NEW_REFERENCE_EXT]), get_data)(input)?;
     let length = slice_to_u16(length) as usize;
@@ -231,6 +252,23 @@ fn reference(input: &[u8]) -> IResult<&[u8], RawTerm> {
     Ok((
         i,
         RawTerm::Ref {
+            node: Box::new(node),
+            id,
+            creation: creation,
+        },
+    ))
+}
+
+fn reference_newer(input: &[u8]) -> IResult<&[u8], RawTerm> {
+    let get_data = tuple((take(2usize), node_or_module, take(4usize)));
+    let (i, (length, node, creation)) = preceded(tag(&[NEWER_REFERENCE_EXT]), get_data)(input)?;
+    let length = slice_to_u16(length) as usize;
+    let (i, id_bytes) = take(4 * length)(i)?;
+    let creation = slice_to_u32(creation);
+    let id: Vec<u32> = id_bytes.chunks(4).map(|x| slice_to_u32(x)).collect();
+    Ok((
+        i,
+        RawTerm::NewerRef {
             node: Box::new(node),
             id,
             creation,
@@ -325,7 +363,7 @@ fn int(input: &[u8]) -> IResult<&[u8], RawTerm> {
 fn float(input: &[u8]) -> IResult<&[u8], RawTerm> {
     let (i, t) = preceded(tag(&[NEW_FLOAT_EXT]), take(8usize))(input)?;
     let new_float: [u8; 8] = t.try_into().unwrap();
-    Ok((i, RawTerm::Float(f64::from_be_bytes(new_float))))
+    Ok((i, RawTerm::Float(f64::from_be_bytes(new_float).into())))
 }
 
 fn empty_list(input: &[u8]) -> IResult<&[u8], RawTerm> {
@@ -340,7 +378,7 @@ fn map(input: &[u8]) -> IResult<&[u8], RawTerm> {
 
     let (i, t) = many_m_n(2 * length, 2 * length, term)(i)?;
 
-    let mut keyword: Vec<(RawTerm, RawTerm)> = Vec::new();
+    let mut keyword = Vec::new();
 
     for ch in t.chunks(2) {
         // all_strings = all_strings && ch[0].is_string_like();

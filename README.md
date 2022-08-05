@@ -2,6 +2,14 @@
 
 Library to convert Erlang External Term Format to Rust objects, without using erlang NIFs.
 
+## Installation
+
+```toml
+[dependencies]
+erlang-term = "1.0.0"
+```
+
+## Usage
 
 ```sh
 elixir -e ":erlang.term_to_binary([1,2,3,4]) |> IO.inspect()" | sed -e 's/<</[/g' | sed -e 's/>>/]/g'
@@ -18,6 +26,7 @@ assert_eq!(Ok(Term::Charlist([1, 2, 3, 4].to_vec())), term);
 ```
 
 Or if you want more controle over the external term format:
+
 ```rust
 use erlang_term::RawTerm;
 
@@ -35,9 +44,27 @@ This is already apparent in the above example. In Erlang a string is just a list
 In this library I tried to split logic and convertion, so in the `RawTerm` there is only conversion between binary and rust enum and in the `Term` there is logic to convert that to a usable interface.
 Therefore `RawTerm` to binary is one-to-one and onto. But `Term` to `RawTerm` there will be information thrown away.
 
+## Features
+
 There is an optional `serde` feature.
 
-More examples:
+```toml
+erlang-term = {version = "1.0.0", features = ["serde_impl"]}
+```
+
+There is an optional `zlib` feature, that allows the etf to be compressed. In Elixir:
+
+```elixir
+:erlang.term_to_binary(t, [:compressed])
+# or
+:erlang.term_to_binary(t, compressed: 6)
+```
+
+```toml
+erlang-term = {version = "1.0.0", features = ["zlib"]}
+```
+
+## More examples
 
 ```rust
 use erlang_term::RawTerm;
@@ -46,7 +73,7 @@ use std::iter::FromIterator;
 let map = RawTerm::Map(vec![
     (RawTerm::SmallAtom(String::from("test")), RawTerm::SmallTuple(vec![RawTerm::SmallAtom(String::from("ok")), RawTerm::SmallInt(15)])),
     (RawTerm::SmallAtom(String::from("another_key")), RawTerm::Binary(b"this is a string".to_vec())),
-    (RawTerm::SmallAtom(String::from("number")), RawTerm::Float(3.1415)),
+    (RawTerm::SmallAtom(String::from("number")), RawTerm::Float(3.1415.into())),
 ]);
 
 let binary = vec![
@@ -56,3 +83,12 @@ let binary = vec![
 assert_eq!(map.to_bytes(), binary);
 ```
 
+## Use Cases
+
+- Filter out non-data (such as references and functions) from stored etf files
+
+- Convert stored etf files to json
+
+See the [filter example](./examples/filter.rs)
+
+License: Unlicense

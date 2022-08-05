@@ -3,10 +3,14 @@ use keylist::Keylist;
 use nom::error::Error;
 use nom::Err as NomErr;
 use num_bigint::BigInt;
+use ordered_float::OrderedFloat;
 use std::collections::HashMap;
+use strum::EnumDiscriminants;
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Hash, PartialEq, EnumDiscriminants)]
+#[strum_discriminants(name(RawTermType))]
 #[cfg_attr(feature = "serde_impl", derive(Serialize, Deserialize))]
+/// Erlang Term Format types
 pub enum RawTerm {
     // ATOM_CACHE_REF
     SmallInt(u8),
@@ -41,10 +45,20 @@ pub enum RawTerm {
         id: u32,
         creation: u8,
     },
+    NewPort {
+        node: Box<RawTerm>,
+        id: u32,
+        creation: u32,
+    },
     Ref {
         node: Box<RawTerm>,
         id: Vec<u32>,
         creation: u8,
+    },
+    NewerRef {
+        node: Box<RawTerm>,
+        id: Vec<u32>,
+        creation: u32,
     },
     Function {
         size: u32,
@@ -61,7 +75,7 @@ pub enum RawTerm {
     // FUN,
     // EXPORT,
     // BIT_BINARY,
-    Float(f64),
+    Float(OrderedFloat<f64>),
     Atom(String),
     SmallAtom(String),
     // REFERENCE_EXT_DEPRECATED,
@@ -83,6 +97,14 @@ impl RawTerm {
         crate::to_gzip_bytes(self, level)
     }
 
+    pub fn as_type(&self) -> RawTermType {
+        RawTermType::from(self)
+    }
+
+    pub fn as_general_type(&self) -> RawTermGeneralType {
+        RawTermGeneralType::from(self.as_type())
+    }
+
     pub fn is_atom(&self) -> bool {
         use RawTerm::*;
         match self {
@@ -99,6 +121,7 @@ impl RawTerm {
         }
     }
 
+    /// if term is a string/binary or atom
     pub fn is_string_like(&self) -> bool {
         self.is_string() | self.is_atom()
     }
@@ -166,8 +189,8 @@ impl RawTerm {
         use RawTerm::*;
         match self {
             SmallTuple(mut x) | LargeTuple(mut x) if x.len() == 2 => {
-                let b = x.pop().unwrap();
-                if let Some(a) = x.pop().unwrap().as_atom() {
+                let b = x.pop().expect("length is two");
+                if let Some(a) = x.pop().expect("length is two").as_atom() {
                     return Some((a, b));
                 }
             }
@@ -190,11 +213,10 @@ impl From<Term> for RawTerm {
             Term::Nil => RawTerm::SmallAtom("nil".to_string()),
             Term::BigInt(x) => big_int_to_raw_term(x),
             Term::Charlist(x) => RawTerm::String(x),
-            Term::Map(x) => map_to_raw_term(x),
             Term::Keyword(x) => keyword_to_raw_term(x),
             Term::List(x) => list_to_raw_term(x),
             Term::Tuple(x) => tuple_to_raw_term(x),
-            Term::MapArbitrary(x) => map_arbitrary_to_raw_term(x),
+            Term::Map(x) => map_arbitrary_to_raw_term(x),
             Term::Other(x) => x,
         }
     }
@@ -212,18 +234,10 @@ fn keyword_to_raw_term(keyword: Keylist<String, Term>) -> RawTerm {
     RawTerm::List(tmp)
 }
 
-fn map_arbitrary_to_raw_term(map: Keylist<Term, Term>) -> RawTerm {
-    let tmp: Vec<(RawTerm, RawTerm)> = map
+fn map_arbitrary_to_raw_term(map: HashMap<Term, Term>) -> RawTerm {
+    let tmp = map
         .into_iter()
         .map(|(k, v)| (RawTerm::from(k), RawTerm::from(v)))
-        .collect();
-    RawTerm::Map(tmp)
-}
-
-fn map_to_raw_term(map: HashMap<String, Term>) -> RawTerm {
-    let tmp: Vec<(RawTerm, RawTerm)> = map
-        .into_iter()
-        .map(|(k, v)| (string_to_raw_term(k), RawTerm::from(v)))
         .collect();
     RawTerm::Map(tmp)
 }
@@ -259,6 +273,62 @@ fn atom_to_raw_term(input: String) -> RawTerm {
         RawTerm::SmallAtom(input)
     } else {
         RawTerm::Atom(input)
+    }
+}
+
+#[derive(Debug, PartialEq, PartialOrd)]
+/// enum use for implement Ordering in the raw terms
+pub enum RawTermGeneralType {
+    // Improper should not be used for ordering.
+    Improper,
+    Number,
+    Atom,
+    Reference,
+    Fun,
+    Port,
+    Pid,
+    Tuple,
+    Map,
+    Nil,
+    List,
+    BitString,
+}
+
+impl From<RawTermType> for RawTermGeneralType {
+    fn from(item: RawTermType) -> RawTermGeneralType {
+        RawTermGeneralType::from(&item)
+    }
+}
+
+impl From<&RawTermType> for RawTermGeneralType {
+    fn from(item: &RawTermType) -> RawTermGeneralType {
+        use RawTermType::*;
+        match item {
+            SmallInt => RawTermGeneralType::Number,
+            Int => RawTermGeneralType::Number,
+            SmallTuple => RawTermGeneralType::Tuple,
+            LargeTuple => RawTermGeneralType::Tuple,
+            Map => RawTermGeneralType::Map,
+            Nil => RawTermGeneralType::Nil,
+            String => RawTermGeneralType::BitString,
+            List => RawTermGeneralType::List,
+            Improper => RawTermGeneralType::Improper,
+            Binary => RawTermGeneralType::BitString,
+            SmallBigInt => RawTermGeneralType::Number,
+            LargeBigInt => RawTermGeneralType::Number,
+            Pid => RawTermGeneralType::Pid,
+            NewPid => RawTermGeneralType::Pid,
+            Port => RawTermGeneralType::Port,
+            NewPort => RawTermGeneralType::Port,
+            Ref => RawTermGeneralType::Reference,
+            NewerRef => RawTermGeneralType::Reference,
+            Function => RawTermGeneralType::Fun,
+            Float => RawTermGeneralType::Number,
+            Atom => RawTermGeneralType::Atom,
+            SmallAtom => RawTermGeneralType::Atom,
+            AtomDeprecated => RawTermGeneralType::Atom,
+            SmallAtomDeprecated => RawTermGeneralType::Atom,
+        }
     }
 }
 
@@ -347,17 +417,21 @@ mod from_term_tests {
         let input = read_binary("bins/struct.bin").unwrap();
         let out = from_bytes(&input).unwrap();
 
-        let expected = RawTerm::Map(vec![
-            (
-                RawTerm::AtomDeprecated("__struct__".to_string()),
-                RawTerm::AtomDeprecated("Elixir.TestStruct".to_string()),
-            ),
-            (
-                RawTerm::AtomDeprecated("a".to_string()),
-                RawTerm::AtomDeprecated("nil".to_string()),
-            ),
-            (RawTerm::AtomDeprecated("b".to_string()), RawTerm::Int(1234)),
-        ]);
+        let expected = RawTerm::Map(
+            vec![
+                (
+                    RawTerm::AtomDeprecated("__struct__".to_string()),
+                    RawTerm::AtomDeprecated("Elixir.TestStruct".to_string()),
+                ),
+                (
+                    RawTerm::AtomDeprecated("a".to_string()),
+                    RawTerm::AtomDeprecated("nil".to_string()),
+                ),
+                (RawTerm::AtomDeprecated("b".to_string()), RawTerm::Int(1234)),
+            ]
+            .into_iter()
+            .collect(),
+        );
 
         assert_eq!(expected, out);
     }
@@ -395,7 +469,7 @@ mod from_term_tests {
         let input = read_binary("bins/float.bin").unwrap();
         let out = from_bytes(&input).unwrap();
 
-        assert_eq!(RawTerm::Float(12.515), out);
+        assert_eq!(RawTerm::Float(12.515.into()), out);
     }
 
     #[test]
@@ -474,20 +548,9 @@ mod from_term_tests {
         use RawTerm::*;
 
         let input = read_binary("bins/map.bin").unwrap();
-        if let Map(mut out) = from_bytes(&input).unwrap() {
-            out.sort_by(|a, b| a.partial_cmp(b).unwrap());
-            // let mut map = Vec::new();
-
-            // map.push((
-            //     RawTerm::AtomDeprecated("just".to_string()),
-            //     RawTerm::Binary(b"some key".to_vec()),
-            // ));
-            // map.push((
-            //     RawTerm::AtomDeprecated("other".to_string()),
-            //     RawTerm::Binary(b"value".to_vec()),
-            // ));
+        if let Map(out) = from_bytes(&input).unwrap() {
             let mut map = vec![
-                (Binary(b"float".to_vec()), Float(3.14)),
+                (Binary(b"float".to_vec()), Float(3.14.into())),
                 (
                     List(vec![Binary(b"list as a key".to_vec())]),
                     List(vec![
@@ -495,7 +558,9 @@ mod from_term_tests {
                         Map(vec![(
                             AtomDeprecated("test".to_string()),
                             AtomDeprecated("false".to_string()),
-                        )]),
+                        )]
+                        .into_iter()
+                        .collect()),
                     ]),
                 ),
                 (SmallInt(1), Binary(b"one".to_vec())),
@@ -509,12 +574,24 @@ mod from_term_tests {
                 ),
                 (
                     Binary(b"nested".to_vec()),
-                    Map(vec![(Binary(b"ok".to_vec()), Nil)]),
+                    Map(vec![(Binary(b"ok".to_vec()), Nil)].into_iter().collect()),
                 ),
             ];
-            map.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
-            assert_eq!(map, out);
+            for item in out.iter() {
+                if let Some(index) =
+                    map.iter()
+                        .enumerate()
+                        .find_map(|(i, x)| if x == item { Some(i) } else { None })
+                {
+                    map.remove(index);
+                } else {
+                    panic!("input has more items then expected")
+                }
+            }
+
+            assert!(!out.is_empty());
+            assert!(map.is_empty());
         } else {
             assert!(false);
         }
@@ -720,4 +797,65 @@ mod from_term_tests {
         let out = from_bytes(&input).unwrap();
         assert!(out.is_list());
     }
+}
+
+#[cfg(test)]
+mod as_type_tests {
+    use crate::raw_term::RawTermType;
+    use crate::RawTerm;
+
+    #[test]
+    fn as_type_binary() {
+        let term = RawTerm::Binary(vec![1, 2, 3, 4]);
+
+        assert_eq!(RawTermType::Binary, term.as_type())
+    }
+
+    #[test]
+    fn as_type_float() {
+        let term = RawTerm::Float(0.123.into());
+
+        assert_eq!(RawTermType::Float, term.as_type())
+    }
+
+    #[test]
+    fn as_type_nil() {
+        let term = RawTerm::Nil;
+
+        assert_eq!(RawTermType::Nil, term.as_type())
+    }
+
+    #[test]
+    fn as_type_map() {
+        let term = RawTerm::Map(
+            vec![(RawTerm::Atom(String::from("test")), RawTerm::Nil)]
+                .into_iter()
+                .collect(),
+        );
+
+        assert_eq!(RawTermType::Map, term.as_type())
+    }
+}
+
+#[test]
+fn raw_sub_type_ordering() {
+    use RawTermGeneralType::*;
+    // number < atom < reference < fun < port < pid < tuple < map < nil < list < bit string
+
+    // Improper should not be used for ordering.
+    assert!(Improper < Number);
+
+    assert!(Number < Atom);
+    assert!(Atom < Reference);
+    assert!(Reference < Fun);
+    assert!(Fun < Port);
+    assert!(Port < Pid);
+    assert!(Pid < Tuple);
+    assert!(Tuple < Map);
+    assert!(Map < Nil);
+    assert!(Nil < List);
+    assert!(List < BitString);
+
+    assert!(Number < BitString);
+    assert!(!(Number > BitString));
 }

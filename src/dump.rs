@@ -33,7 +33,7 @@ pub fn internal_to_binary(raw: RawTerm, add_prefix: bool) -> Vec<u8> {
         SmallAtom(x) => small_atom(x, add_prefix),
         AtomDeprecated(x) => atom_deprecated(x, add_prefix),
         SmallAtomDeprecated(x) => small_atom_deprecated(x, add_prefix),
-        Float(x) => float(x, add_prefix),
+        Float(x) => float(*x, add_prefix),
         Nil => nil(add_prefix),
         SmallInt(x) => small_int(x, add_prefix),
         Int(x) => int(x, add_prefix),
@@ -46,7 +46,9 @@ pub fn internal_to_binary(raw: RawTerm, add_prefix: bool) -> Vec<u8> {
         List(x) => list(x, add_prefix),
         Map(x) => map(x, add_prefix),
         Port { node, id, creation } => port(*node, id, creation, add_prefix),
+        NewPort { node, id, creation } => new_port(*node, id, creation, add_prefix),
         Ref { node, id, creation } => reference(*node, id, creation, add_prefix),
+        NewerRef { node, id, creation } => newer_reference(*node, id, creation, add_prefix),
         Pid {
             node,
             id,
@@ -335,6 +337,21 @@ fn port(node: RawTerm, id: u32, creation: u8, add_prefix: bool) -> Vec<u8> {
     buffer
 }
 
+fn new_port(node: RawTerm, id: u32, creation: u32, add_prefix: bool) -> Vec<u8> {
+    let node_binary = internal_to_binary(node, false);
+
+    let mut buffer = Vec::with_capacity(node_binary.len() + 7);
+
+    if add_prefix {
+        push_prefix(&mut buffer)
+    };
+    buffer.push(NEW_PORT_EXT);
+    buffer.extend(node_binary);
+    buffer.extend(&(id as u32).to_be_bytes());
+    buffer.extend(creation.to_be_bytes());
+    buffer
+}
+
 fn reference(node: RawTerm, id: Vec<u32>, creation: u8, add_prefix: bool) -> Vec<u8> {
     let id_length = id.len();
     let node_binary = internal_to_binary(node, false);
@@ -351,7 +368,28 @@ fn reference(node: RawTerm, id: Vec<u32>, creation: u8, add_prefix: bool) -> Vec
     buffer.push(NEW_REFERENCE_EXT);
     buffer.extend(&(id_length as u16).to_be_bytes());
     buffer.extend(node_binary);
-    buffer.push(creation);
+    buffer.extend(creation.to_be_bytes());
+    buffer.extend(id_bytes);
+    buffer
+}
+
+fn newer_reference(node: RawTerm, id: Vec<u32>, creation: u32, add_prefix: bool) -> Vec<u8> {
+    let id_length = id.len();
+    let node_binary = internal_to_binary(node, false);
+    let mut id_bytes: Vec<u8> = Vec::new();
+    for part in id {
+        id_bytes.extend(&(part as u32).to_be_bytes());
+    }
+
+    let mut buffer = Vec::with_capacity(node_binary.len() + id_bytes.len() + 5);
+
+    if add_prefix {
+        push_prefix(&mut buffer)
+    };
+    buffer.push(NEWER_REFERENCE_EXT);
+    buffer.extend(&(id_length as u16).to_be_bytes());
+    buffer.extend(node_binary);
+    buffer.extend(creation.to_be_bytes());
     buffer.extend(id_bytes);
     buffer
 }
@@ -466,7 +504,7 @@ mod binary_tests {
 
     #[test]
     fn float() {
-        let out = to_bytes(RawTerm::Float(3.14));
+        let out = to_bytes(RawTerm::Float(3.14.into()));
         assert_eq!(out, vec![REVISION, 70, 64, 9, 30, 184, 81, 235, 133, 31])
     }
 
@@ -584,16 +622,20 @@ mod binary_tests {
 
     #[test]
     fn atom_map() {
-        let out = to_bytes(RawTerm::Map(vec![
-            (
-                RawTerm::AtomDeprecated("other".to_string()),
-                RawTerm::Binary(b"test".to_vec()),
-            ),
-            (
-                RawTerm::AtomDeprecated("some".to_string()),
-                RawTerm::SmallInt(3),
-            ),
-        ]));
+        let out = to_bytes(RawTerm::Map(
+            vec![
+                (
+                    RawTerm::AtomDeprecated("other".to_string()),
+                    RawTerm::Binary(b"test".to_vec()),
+                ),
+                (
+                    RawTerm::AtomDeprecated("some".to_string()),
+                    RawTerm::SmallInt(3),
+                ),
+            ]
+            .into_iter()
+            .collect(),
+        ));
 
         assert_eq!(
             out,
@@ -607,8 +649,8 @@ mod binary_tests {
     #[test]
     fn map() {
         use RawTerm::*;
-        let mut map = vec![
-            (Binary(b"float".to_vec()), Float(3.14)),
+        let map = vec![
+            (SmallInt(1), Binary(b"one".to_vec())),
             (
                 List(vec![Binary(b"list as a key".to_vec())]),
                 List(vec![
@@ -616,24 +658,28 @@ mod binary_tests {
                     Map(vec![(
                         AtomDeprecated("test".to_string()),
                         AtomDeprecated("false".to_string()),
-                    )]),
+                    )]
+                    .into_iter()
+                    .collect()),
                 ]),
             ),
-            (SmallInt(1), Binary(b"one".to_vec())),
-            (
-                AtomDeprecated("tuple".to_string()),
-                SmallTuple(vec![SmallInt(1), AtomDeprecated("more".to_string())]),
-            ),
+            (Binary(b"float".to_vec()), Float(3.14.into())),
             (
                 Binary(b"large".to_vec()),
                 SmallBigInt(BigInt::parse_bytes(b"123456789123456789", 10).unwrap()),
             ),
             (
                 Binary(b"nested".to_vec()),
-                Map(vec![(Binary(b"ok".to_vec()), Nil)]),
+                Map(vec![(Binary(b"ok".to_vec()), Nil)].into_iter().collect()),
             ),
-        ];
-        map.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            (
+                AtomDeprecated("tuple".to_string()),
+                SmallTuple(vec![SmallInt(1), AtomDeprecated("more".to_string())]),
+            ),
+        ]
+        .into_iter()
+        .collect();
+
         let out = to_bytes(RawTerm::Map(map));
 
         assert_eq!(
@@ -670,6 +716,23 @@ mod binary_tests {
     }
 
     #[test]
+    fn new_port() {
+        let out = to_bytes(RawTerm::NewPort {
+            node: Box::new(RawTerm::SmallAtom("something@something".to_string())),
+            id: 123,
+            creation: 2,
+        });
+
+        assert_eq!(
+            out,
+            vec![
+                REVISION, 89, 119, 19, 115, 111, 109, 101, 116, 104, 105, 110, 103, 64, 115, 111,
+                109, 101, 116, 104, 105, 110, 103, 0, 0, 0, 123, 0, 0, 0, 2
+            ]
+        )
+    }
+
+    #[test]
     fn reference() {
         let out = to_bytes(RawTerm::Ref {
             node: Box::new(RawTerm::AtomDeprecated("something@something".to_string())),
@@ -683,6 +746,24 @@ mod binary_tests {
                 REVISION, 114, 0, 3, 100, 0, 19, 115, 111, 109, 101, 116, 104, 105, 110, 103, 64,
                 115, 111, 109, 101, 116, 104, 105, 110, 103, 2, 0, 2, 108, 6, 26, 36, 0, 6, 0, 3,
                 158, 77
+            ]
+        )
+    }
+
+    #[test]
+    fn newer_reference() {
+        let out = to_bytes(RawTerm::NewerRef {
+            node: Box::new(RawTerm::AtomDeprecated("something@something".to_string())),
+            id: vec![158726, 438566918, 237133],
+            creation: 2,
+        });
+
+        assert_eq!(
+            out,
+            vec![
+                REVISION, 90, 0, 3, 100, 0, 19, 115, 111, 109, 101, 116, 104, 105, 110, 103, 64,
+                115, 111, 109, 101, 116, 104, 105, 110, 103, 0, 0, 0, 2, 0, 2, 108, 6, 26, 36, 0,
+                6, 0, 3, 158, 77
             ]
         )
     }

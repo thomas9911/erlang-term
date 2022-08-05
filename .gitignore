@@ -6,3 +6,4 @@ Cargo.lock
 
 # for local bench files
 /bench
+/bench_ex

@@ -1,6 +1,6 @@
 [package]
 name = "erlang-term"
-version = "0.2.4"
+version = "1.0.0"
 authors = ["Thomas <thomastimmer11@hotmail.com>"]
 edition = "2018"
 description = "Library to convert Erlang External Term Format to Rust objects, without using erlang NIFs."
@@ -19,14 +19,21 @@ exclude = [
 nom = "7.1"
 num-bigint = "0.4"
 num-traits = "0.2"
-keylist = "0.2"
+keylist = "0.3"
 flate2 = {version = "1.0", optional = true}
 serde = {version = "1.0", optional = true}
 serde_derive = {version = "1.0", optional = true}
 serde_json = {version = "1.0", optional = true}
+strum = { version = "0.24", features = ["derive"] }
+ordered-float = "3.0.0"
 
 [dev-dependencies]
+brunch = "0.2.6"
 
 [features]
-serde_impl = ["serde", "serde_derive", "serde_json", "keylist/serde", "num-bigint/serde"]
+serde_impl = ["serde", "serde_derive", "serde_json", "keylist/serde", "num-bigint/serde", "ordered-float/serde"]
 zlib = ["flate2"]
+
+[[bench]]
+name = "keylist_vs_btree"
+harness = false

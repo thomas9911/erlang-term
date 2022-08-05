@@ -1,0 +1,2 @@
+defmodule IntegrationTest do
+end

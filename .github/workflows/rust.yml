@@ -12,20 +12,54 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust:
+          - stable
+          - beta
+          - nightly
+          - 1.52.0  # MSRV
     steps:
       - uses: actions/checkout@v2
-      - name: Build
-        run: cargo build --verbose
-      - name: Run tests
-        run: cargo test --verbose
+      - name: Install minimal stable
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          override: true
+      - uses: actions-rs/cargo@v1
+        name: Build
+        with:
+          command: build
+      - uses: actions-rs/cargo@v1
+        name: Run tests
+        with:
+          command: test
   test-all-features:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust:
+          - stable
+          - beta
+          - nightly
+          - 1.52.0  # MSRV
     steps:
       - uses: actions/checkout@v2
-      - name: Build
-        run: cargo build --all-features --verbose
-      - name: Run tests
-        run: cargo test --all-features --verbose
+      - name: Install minimal stable
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          override: true
+      - uses: actions-rs/cargo@v1
+        name: Build
+        with:
+          command: build --all-features
+      - uses: actions-rs/cargo@v1
+        name: Run tests
+        with:
+          command: test --all-features
   integration-test:
     runs-on: ubuntu-latest
     name: OTP ${{matrix.otp}} / Elixir ${{matrix.elixir}}

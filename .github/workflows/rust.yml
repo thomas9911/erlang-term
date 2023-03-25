@@ -18,23 +18,17 @@ jobs:
           - stable
           - beta
           - nightly
-          - 1.52.0  # MSRV
+          - stable 18 months ago
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install minimal stable
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: ${{ matrix.rust }}
-          override: true
-      - uses: actions-rs/cargo@v1
-        name: Build
-        with:
-          command: build
-      - uses: actions-rs/cargo@v1
-        name: Run tests
-        with:
-          command: test
+      - name: Build
+        run: cargo build --verbose
+      - name: Run tests
+        run: cargo test --verbose
   test-all-features:
     runs-on: ubuntu-latest
     strategy:
@@ -43,23 +37,17 @@ jobs:
           - stable
           - beta
           - nightly
-          - 1.52.0  # MSRV
+          - stable 18 months ago
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install minimal stable
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: ${{ matrix.rust }}
-          override: true
-      - uses: actions-rs/cargo@v1
-        name: Build
-        with:
-          command: build --all-features
-      - uses: actions-rs/cargo@v1
-        name: Run tests
-        with:
-          command: test --all-features
+      - name: Build
+        run: cargo build --verbose --all-features
+      - name: Run tests
+        run: cargo test --verbose --all-features
   integration-test:
     runs-on: ubuntu-latest
     name: OTP ${{matrix.otp}} / Elixir ${{matrix.elixir}}
@@ -68,7 +56,7 @@ jobs:
         otp: ["23.3", "24.3"]
         elixir: ["1.12.3", "1.13.4"]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: erlef/setup-beam@v1
         with:
           otp-version: ${{matrix.otp}}

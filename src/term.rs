@@ -605,13 +605,37 @@ impl From<&str> for Term {
     }
 }
 
-impl<T: Into<Term>, V: Into<Term>> From<(T, V)> for Term {
-    fn from(input: (T, V)) -> Term {
-        let t = input.0.into();
-        let v = input.1.into();
-        Term::Tuple(vec![t, v])
-    }
+macro_rules! impl_tuple {
+    ($($idx:tt $t:tt),+) => {
+        impl<$($t,)+> From<($($t,)+)> for Term
+        where
+            $($t: Into<Term>,)+
+        {
+            fn from(input: ($($t,)+)) -> Self {
+                Term::Tuple(vec!($(
+                   input.$idx.into(),
+                )+))
+            }
+        }
+    };
 }
+
+impl_tuple!(0 A);
+impl_tuple!(0 A, 1 B);
+impl_tuple!(0 A, 1 B, 2 C);
+impl_tuple!(0 A, 1 B, 2 C, 3 D);
+impl_tuple!(0 A, 1 B, 2 C, 3 D, 4 E);
+impl_tuple!(0 A, 1 B, 2 C, 3 D, 4 E, 5 F);
+impl_tuple!(0 A, 1 B, 2 C, 3 D, 4 E, 5 F, 6 G);
+impl_tuple!(0 A, 1 B, 2 C, 3 D, 4 E, 5 F, 6 G, 7 H);
+impl_tuple!(0 A, 1 B, 2 C, 3 D, 4 E, 5 F, 6 G, 7 H, 8 I);
+impl_tuple!(0 A, 1 B, 2 C, 3 D, 4 E, 5 F, 6 G, 7 H, 8 I, 9 J);
+impl_tuple!(0 A, 1 B, 2 C, 3 D, 4 E, 5 F, 6 G, 7 H, 8 I, 9 J, 10 K);
+impl_tuple!(0 A, 1 B, 2 C, 3 D, 4 E, 5 F, 6 G, 7 H, 8 I, 9 J, 10 K, 11 L);
+impl_tuple!(0 A, 1 B, 2 C, 3 D, 4 E, 5 F, 6 G, 7 H, 8 I, 9 J, 10 K, 11 L, 12 M);
+impl_tuple!(0 A, 1 B, 2 C, 3 D, 4 E, 5 F, 6 G, 7 H, 8 I, 9 J, 10 K, 11 L, 12 M, 13 N);
+impl_tuple!(0 A, 1 B, 2 C, 3 D, 4 E, 5 F, 6 G, 7 H, 8 I, 9 J, 10 K, 11 L, 12 M, 13 N, 14 O);
+impl_tuple!(0 A, 1 B, 2 C, 3 D, 4 E, 5 F, 6 G, 7 H, 8 I, 9 J, 10 K, 11 L, 12 M, 13 N, 14 O, 15 P);
 
 impl<T: Into<Term>> From<Vec<T>> for Term {
     fn from(input: Vec<T>) -> Term {
@@ -942,6 +966,30 @@ mod from_tests {
             ])),
             map.into()
         );
+    }
+
+    #[test]
+    fn from_tuple_1() {
+        let expected = Term::Tuple(vec![0.into()]);
+
+        assert_eq!(expected, (0,).into())
+    }
+
+    #[test]
+    fn from_tuple_2() {
+        let expected = Term::Tuple(vec![0.into(), 1.into()]);
+
+        assert_eq!(expected, (0, 1).into())
+    }
+
+    #[test]
+    fn from_tuple_16() {
+        let expected = Term::Tuple((0..16).map(Term::from).collect());
+
+        assert_eq!(
+            expected,
+            (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15).into()
+        )
     }
 }
 

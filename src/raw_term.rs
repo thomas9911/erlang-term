@@ -112,18 +112,15 @@ impl RawTerm {
 
     pub fn is_atom(&self) -> bool {
         use RawTerm::*;
-        match self {
-            Atom(_) | AtomDeprecated(_) | SmallAtom(_) | SmallAtomDeprecated(_) => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            Atom(_) | AtomDeprecated(_) | SmallAtom(_) | SmallAtomDeprecated(_)
+        )
     }
 
     pub fn is_string(&self) -> bool {
         use RawTerm::*;
-        match self {
-            Binary(_) | String(_) => true,
-            _ => false,
-        }
+        matches!(self, Binary(_) | String(_))
     }
 
     /// if term is a string/binary or atom
@@ -133,10 +130,7 @@ impl RawTerm {
 
     pub fn is_integer(&self) -> bool {
         use RawTerm::*;
-        match self {
-            SmallInt(_) | Int(_) => true,
-            _ => false,
-        }
+        matches!(self, SmallInt(_) | Int(_))
     }
 
     pub fn is_atom_pair(&self) -> bool {
@@ -157,10 +151,7 @@ impl RawTerm {
 
     pub fn is_list(&self) -> bool {
         use RawTerm::*;
-        match self {
-            List(_) => true,
-            _ => false,
-        }
+        matches!(self, List(_))
     }
 
     pub fn as_atom(self) -> Option<String> {
@@ -251,13 +242,13 @@ fn list_to_raw_term(list: Vec<Term>) -> RawTerm {
     if list.is_empty() {
         RawTerm::Nil
     } else {
-        RawTerm::List(list.into_iter().map(|x| RawTerm::from(x)).collect())
+        RawTerm::List(list.into_iter().map(RawTerm::from).collect())
     }
 }
 
 fn tuple_to_raw_term(tuple: Vec<Term>) -> RawTerm {
     let len = tuple.len();
-    let x = tuple.into_iter().map(|x| RawTerm::from(x)).collect();
+    let x = tuple.into_iter().map(RawTerm::from).collect();
     if len < 16 {
         RawTerm::SmallTuple(x)
     } else {

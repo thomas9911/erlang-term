@@ -1,6 +1,6 @@
 use erlang_term::Term;
 
-const HELP_TEXT: &'static str = r###"parse elixir binary to Term
+const HELP_TEXT: &str = r###"parse elixir binary to Term
 
 example: 
     cargo run --example parse "$(elixir -e ":erlang.term_to_binary(%{{ok: 15}}) |> IO.inspect()")"
@@ -21,7 +21,7 @@ fn main() {
     let x: Vec<u8> = text
         .trim_start_matches("<<")
         .trim_end_matches(">>")
-        .split(",")
+        .split(',')
         .map(|x| x.trim().parse().expect("input is not a elixir binary"))
         .collect();
 

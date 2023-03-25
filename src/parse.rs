@@ -250,13 +250,13 @@ fn reference_new(input: &[u8]) -> IResult<&[u8], RawTerm> {
     let length = slice_to_u16(length) as usize;
     let (i, id_bytes) = take(4 * length)(i)?;
     let creation = slice_to_u8(creation);
-    let id: Vec<u32> = id_bytes.chunks(4).map(|x| slice_to_u32(x)).collect();
+    let id: Vec<u32> = id_bytes.chunks(4).map(slice_to_u32).collect();
     Ok((
         i,
         RawTerm::Ref {
             node: Box::new(node),
             id,
-            creation: creation,
+            creation,
         },
     ))
 }
@@ -267,7 +267,7 @@ fn reference_newer(input: &[u8]) -> IResult<&[u8], RawTerm> {
     let length = slice_to_u16(length) as usize;
     let (i, id_bytes) = take(4 * length)(i)?;
     let creation = slice_to_u32(creation);
-    let id: Vec<u32> = id_bytes.chunks(4).map(|x| slice_to_u32(x)).collect();
+    let id: Vec<u32> = id_bytes.chunks(4).map(slice_to_u32).collect();
     Ok((
         i,
         RawTerm::NewerRef {

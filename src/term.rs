@@ -145,7 +145,7 @@ impl Hash for Term {
             Atom(x) => x.hash(state),
             Bytes(x) => x.hash(state),
             Bool(x) => x.hash(state),
-            Nil => ().hash(state),
+            Nil => "nil".hash(state),
             BigInt(x) => x.hash(state),
             Charlist(x) => x.hash(state),
             Map(x) => {
@@ -329,34 +329,22 @@ impl Term {
 
     pub fn is_byte(&self) -> bool {
         use Term::*;
-        match self {
-            Byte(_) => true,
-            _ => false,
-        }
+        matches!(self, Byte(_))
     }
 
     pub fn is_string(&self) -> bool {
         use Term::*;
-        match self {
-            String(_) => true,
-            _ => false,
-        }
+        matches!(self, String(_))
     }
 
     pub fn is_atom(&self) -> bool {
         use Term::*;
-        match self {
-            Atom(_) => true,
-            _ => false,
-        }
+        matches!(self, Atom(_))
     }
 
     pub fn is_tuple(&self) -> bool {
         use Term::*;
-        match self {
-            Tuple(_) => true,
-            _ => false,
-        }
+        matches!(self, Tuple(_))
     }
 
     ///
@@ -369,18 +357,12 @@ impl Term {
     /// ```
     pub fn is_pair_tuple(&self) -> bool {
         use Term::*;
-        match self {
-            Tuple(x) if x.len() == 2 => true,
-            _ => false,
-        }
+        matches!(self, Tuple(x) if x.len() == 2)
     }
 
     pub fn is_list(&self) -> bool {
         use Term::*;
-        match self {
-            List(_) => true,
-            _ => false,
-        }
+        matches!(self, List(_))
     }
 
     ///
@@ -395,10 +377,7 @@ impl Term {
     /// ```
     pub fn is_string_tuple_pair(&self) -> bool {
         use Term::*;
-        match self {
-            Tuple(x) if (x.len() == 2) & x[0].is_string() => true,
-            _ => false,
-        }
+        matches!(self, Tuple(x) if (x.len() == 2) & x[0].is_string())
     }
 
     pub fn as_bool(self) -> Option<bool> {
@@ -1047,7 +1026,10 @@ mod print {
             "[1, 2, 3, 4, 5, 6, 7]",
             print_elixir_term(&Term::Charlist(vec![1, 2, 3, 4, 5, 6, 7]))
         );
-        assert_eq!("3.123124123123123", print_elixir_term(&Term::Float(3.123_124_123_123_123.into())));
+        assert_eq!(
+            "3.123124123123123",
+            print_elixir_term(&Term::Float(3.123_124_123_123_123.into()))
+        );
         assert_eq!("123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789", print_elixir_term(&Term::BigInt(BigInt::parse_bytes(b"123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789", 10).unwrap())));
         let keylist: Keylist<String, Term> = Keylist::from_iter(vec![
             ("test".into(), 1.into()),

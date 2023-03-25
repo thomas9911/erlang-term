@@ -6,7 +6,7 @@ Library to convert Erlang External Term Format to Rust objects, without using er
 
 ```toml
 [dependencies]
-erlang-term = "1.0.0"
+erlang-term = "1.1.0"
 ```
 
 ## Usage
@@ -49,7 +49,7 @@ Therefore `RawTerm` to binary is one-to-one and onto. But `Term` to `RawTerm` th
 There is an optional `serde` feature.
 
 ```toml
-erlang-term = {version = "1.0.0", features = ["serde_impl"]}
+erlang-term = {version = "1.1.0", features = ["serde_impl"]}
 ```
 
 There is an optional `zlib` feature, that allows the etf to be compressed. In Elixir:
@@ -61,7 +61,7 @@ There is an optional `zlib` feature, that allows the etf to be compressed. In El
 ```
 
 ```toml
-erlang-term = {version = "1.0.0", features = ["zlib"]}
+erlang-term = {version = "1.1.0", features = ["zlib"]}
 ```
 
 ## More examples

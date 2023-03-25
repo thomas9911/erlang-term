@@ -7,9 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 25-03-23
+
 ### Added
 
 - Support for the bitbinary type
+- Implement `Into<Term>` for multiple tuple lengths
 
 ## [1.0.0] - 05-08-22
 

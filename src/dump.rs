@@ -365,7 +365,7 @@ fn new_port(node: RawTerm, id: u32, creation: u32, add_prefix: bool) -> Vec<u8> 
     buffer.push(NEW_PORT_EXT);
     buffer.extend(node_binary);
     buffer.extend(&(id as u32).to_be_bytes());
-    buffer.extend(creation.to_be_bytes());
+    buffer.extend(&creation.to_be_bytes());
     buffer
 }
 
@@ -385,7 +385,7 @@ fn reference(node: RawTerm, id: Vec<u32>, creation: u8, add_prefix: bool) -> Vec
     buffer.push(NEW_REFERENCE_EXT);
     buffer.extend(&(id_length as u16).to_be_bytes());
     buffer.extend(node_binary);
-    buffer.extend(creation.to_be_bytes());
+    buffer.extend(&creation.to_be_bytes());
     buffer.extend(id_bytes);
     buffer
 }
@@ -406,7 +406,7 @@ fn newer_reference(node: RawTerm, id: Vec<u32>, creation: u32, add_prefix: bool)
     buffer.push(NEWER_REFERENCE_EXT);
     buffer.extend(&(id_length as u16).to_be_bytes());
     buffer.extend(node_binary);
-    buffer.extend(creation.to_be_bytes());
+    buffer.extend(&creation.to_be_bytes());
     buffer.extend(id_bytes);
     buffer
 }

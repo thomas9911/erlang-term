@@ -18,7 +18,8 @@ jobs:
           - stable
           - beta
           - nightly
-          - stable 18 months ago
+          # - stable 18 months ago
+          - 1.63.0
     steps:
       - uses: actions/checkout@v3
       - name: Install minimal stable
@@ -37,7 +38,8 @@ jobs:
           - stable
           - beta
           - nightly
-          - stable 18 months ago
+          # - stable 18 months ago
+          - 1.63.0
     steps:
       - uses: actions/checkout@v3
       - name: Install minimal stable
@@ -49,7 +51,7 @@ jobs:
       - name: Run tests
         run: cargo test --verbose --all-features
   integration-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: OTP ${{matrix.otp}} / Elixir ${{matrix.elixir}}
     strategy:
       matrix:

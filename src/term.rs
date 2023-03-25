@@ -192,7 +192,7 @@ fn is_string_printable_byte(byte: &u8) -> bool {
 }
 
 fn raw_term_list_to_term_list(raw_list: Vec<RawTerm>) -> Vec<Term> {
-    raw_list.into_iter().map(|x| Term::from(x)).collect()
+    raw_list.into_iter().map(Term::from).collect()
 }
 
 fn atom_to_term(atom: String) -> Term {
@@ -280,7 +280,7 @@ fn format_atom(a: &str) -> String {
     }
     if a.chars().all(|x| x.is_ascii_alphanumeric()) {
         if a.chars().next().unwrap().is_ascii_uppercase() {
-            return format!("{}", a);
+            return a.to_string();
         }
         if !a.chars().next().unwrap().is_ascii_digit() {
             return format!(":{}", a);
@@ -1047,7 +1047,7 @@ mod print {
             "[1, 2, 3, 4, 5, 6, 7]",
             print_elixir_term(&Term::Charlist(vec![1, 2, 3, 4, 5, 6, 7]))
         );
-        assert_eq!("3.123124123123123", print_elixir_term(&Term::Float(3.12312412312312323546888848456546565516164651884446584621651658468222541315465468542651.into())));
+        assert_eq!("3.123124123123123", print_elixir_term(&Term::Float(3.123_124_123_123_123.into())));
         assert_eq!("123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789", print_elixir_term(&Term::BigInt(BigInt::parse_bytes(b"123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789", 10).unwrap())));
         let keylist: Keylist<String, Term> = Keylist::from_iter(vec![
             ("test".into(), 1.into()),

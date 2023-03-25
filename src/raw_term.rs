@@ -251,13 +251,13 @@ fn list_to_raw_term(list: Vec<Term>) -> RawTerm {
     if list.is_empty() {
         RawTerm::Nil
     } else {
-        RawTerm::List(list.into_iter().map(|x| RawTerm::from(x)).collect())
+        RawTerm::List(list.into_iter().map(RawTerm::from).collect())
     }
 }
 
 fn tuple_to_raw_term(tuple: Vec<Term>) -> RawTerm {
     let len = tuple.len();
-    let x = tuple.into_iter().map(|x| RawTerm::from(x)).collect();
+    let x = tuple.into_iter().map(RawTerm::from).collect();
     if len < 16 {
         RawTerm::SmallTuple(x)
     } else {

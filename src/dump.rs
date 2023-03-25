@@ -107,7 +107,7 @@ fn atom(raw: String, add_prefix: bool) -> Vec<u8> {
         push_prefix(&mut buffer)
     };
     buffer.push(ATOM_UTF8_EXT);
-    buffer.extend(&(length as u16).to_be_bytes());
+    buffer.extend((length as u16).to_be_bytes());
     buffer.extend(bytes);
     buffer
 }
@@ -132,7 +132,7 @@ fn atom_deprecated(raw: String, add_prefix: bool) -> Vec<u8> {
         push_prefix(&mut buffer)
     };
     buffer.push(ATOM_EXT_DEPRECATED);
-    buffer.extend(&(length as u16).to_be_bytes());
+    buffer.extend((length as u16).to_be_bytes());
     buffer.extend(bytes);
     buffer
 }
@@ -144,7 +144,7 @@ fn float(raw: f64, add_prefix: bool) -> Vec<u8> {
         push_prefix(&mut buffer)
     };
     buffer.push(NEW_FLOAT_EXT);
-    buffer.extend(&raw.to_be_bytes());
+    buffer.extend(raw.to_be_bytes());
     buffer
 }
 
@@ -171,7 +171,7 @@ fn int(raw: i32, add_prefix: bool) -> Vec<u8> {
         push_prefix(&mut buffer)
     };
     buffer.push(INTEGER_EXT);
-    buffer.extend(&raw.to_be_bytes());
+    buffer.extend(raw.to_be_bytes());
     buffer
 }
 
@@ -183,8 +183,8 @@ fn string(mut raw: Vec<u8>, add_prefix: bool) -> Vec<u8> {
         push_prefix(&mut buffer)
     };
     buffer.push(STRING_EXT);
-    buffer.extend(&(length as u16).to_be_bytes());
-    buffer.extend(raw.drain(..));
+    buffer.extend((length as u16).to_be_bytes());
+    buffer.append(&mut raw);
     buffer
 }
 
@@ -196,8 +196,8 @@ fn binary(mut raw: Vec<u8>, add_prefix: bool) -> Vec<u8> {
         push_prefix(&mut buffer)
     };
     buffer.push(BINARY_EXT);
-    buffer.extend(&(length as u32).to_be_bytes());
-    buffer.extend(raw.drain(..));
+    buffer.extend((length as u32).to_be_bytes());
+    buffer.append(&mut raw);
     buffer
 }
 
@@ -209,9 +209,9 @@ fn bitbinary(mut binary: Vec<u8>, bit: u8, bits: u8, add_prefix: bool) -> Vec<u8
         push_prefix(&mut buffer)
     };
     buffer.push(BIT_BINARY_EXT);
-    buffer.extend(&((length as u32) + 1).to_be_bytes());
+    buffer.extend(((length as u32) + 1).to_be_bytes());
     buffer.push(bits);
-    buffer.extend(binary.drain(..));
+    buffer.append(&mut binary);
     // do some magic here
     buffer.push(bit << (8u8.saturating_sub(bits)));
     buffer
@@ -229,7 +229,7 @@ fn small_big_int(raw: BigInt, add_prefix: bool) -> Vec<u8> {
     buffer.push(SMALL_BIG_EXT);
     buffer.push(bytes.len() as u8);
     buffer.push(sign);
-    buffer.extend(bytes.drain(..));
+    buffer.append(&mut bytes);
     buffer
 }
 
@@ -244,9 +244,9 @@ fn large_big_int(raw: BigInt, add_prefix: bool) -> Vec<u8> {
         push_prefix(&mut buffer)
     };
     buffer.push(LARGE_BIG_EXT);
-    buffer.extend(&(length as u32).to_be_bytes());
+    buffer.extend((length as u32).to_be_bytes());
     buffer.push(sign);
-    buffer.extend(bytes.drain(..));
+    buffer.append(&mut bytes);
     buffer
 }
 
@@ -254,8 +254,7 @@ fn small_tuple(raw: Vec<RawTerm>, add_prefix: bool) -> Vec<u8> {
     let arity = raw.len();
     let mut bytes: Vec<u8> = raw
         .into_iter()
-        .map(|x| internal_to_binary(x, false))
-        .flatten()
+        .flat_map(|x| internal_to_binary(x, false))
         .collect();
 
     let mut buffer = Vec::with_capacity(bytes.len() + 3);
@@ -265,7 +264,7 @@ fn small_tuple(raw: Vec<RawTerm>, add_prefix: bool) -> Vec<u8> {
     };
     buffer.push(SMALL_TUPLE_EXT);
     buffer.push(arity as u8);
-    buffer.extend(bytes.drain(..));
+    buffer.append(&mut bytes);
     buffer
 }
 
@@ -273,8 +272,7 @@ fn large_tuple(raw: Vec<RawTerm>, add_prefix: bool) -> Vec<u8> {
     let arity = raw.len();
     let mut bytes: Vec<u8> = raw
         .into_iter()
-        .map(|x| internal_to_binary(x, false))
-        .flatten()
+        .flat_map(|x| internal_to_binary(x, false))
         .collect();
 
     let mut buffer = Vec::with_capacity(bytes.len() + 6);
@@ -283,8 +281,8 @@ fn large_tuple(raw: Vec<RawTerm>, add_prefix: bool) -> Vec<u8> {
         push_prefix(&mut buffer)
     };
     buffer.push(LARGE_TUPLE_EXT);
-    buffer.extend(&(arity as u32).to_be_bytes());
-    buffer.extend(bytes.drain(..));
+    buffer.extend((arity as u32).to_be_bytes());
+    buffer.append(&mut bytes);
     buffer
 }
 
@@ -302,8 +300,7 @@ fn list(mut raw: Vec<RawTerm>, add_prefix: bool) -> Vec<u8> {
     let arity = raw.len() - 1;
     let mut bytes: Vec<u8> = raw
         .into_iter()
-        .map(|x| internal_to_binary(x, false))
-        .flatten()
+        .flat_map(|x| internal_to_binary(x, false))
         .collect();
 
     let mut buffer = Vec::with_capacity(bytes.len() + 6);
@@ -311,8 +308,8 @@ fn list(mut raw: Vec<RawTerm>, add_prefix: bool) -> Vec<u8> {
         push_prefix(&mut buffer)
     };
     buffer.push(LIST_EXT);
-    buffer.extend(&(arity as u32).to_be_bytes());
-    buffer.extend(bytes.drain(..));
+    buffer.extend((arity as u32).to_be_bytes());
+    buffer.append(&mut bytes);
     buffer
 }
 
@@ -320,12 +317,11 @@ fn map(raw: Vec<(RawTerm, RawTerm)>, add_prefix: bool) -> Vec<u8> {
     let arity = raw.len();
     let mut bytes: Vec<u8> = raw
         .into_iter()
-        .map(|(a, b)| {
+        .flat_map(|(a, b)| {
             internal_to_binary(a, false)
                 .into_iter()
                 .chain(internal_to_binary(b, false))
         })
-        .flatten()
         .collect();
 
     let mut buffer = Vec::with_capacity(bytes.len() + 6);
@@ -334,8 +330,8 @@ fn map(raw: Vec<(RawTerm, RawTerm)>, add_prefix: bool) -> Vec<u8> {
         push_prefix(&mut buffer)
     };
     buffer.push(MAP_EXT);
-    buffer.extend(&(arity as u32).to_be_bytes());
-    buffer.extend(bytes.drain(..));
+    buffer.extend((arity as u32).to_be_bytes());
+    buffer.append(&mut bytes);
     buffer
 }
 
@@ -349,7 +345,7 @@ fn port(node: RawTerm, id: u32, creation: u8, add_prefix: bool) -> Vec<u8> {
     };
     buffer.push(PORT_EXT);
     buffer.extend(node_binary);
-    buffer.extend(&(id as u32).to_be_bytes());
+    buffer.extend(id.to_be_bytes());
     buffer.push(creation);
     buffer
 }
@@ -364,8 +360,8 @@ fn new_port(node: RawTerm, id: u32, creation: u32, add_prefix: bool) -> Vec<u8> 
     };
     buffer.push(NEW_PORT_EXT);
     buffer.extend(node_binary);
-    buffer.extend(&(id as u32).to_be_bytes());
-    buffer.extend(&creation.to_be_bytes());
+    buffer.extend(id.to_be_bytes());
+    buffer.extend(creation.to_be_bytes());
     buffer
 }
 
@@ -374,7 +370,7 @@ fn reference(node: RawTerm, id: Vec<u32>, creation: u8, add_prefix: bool) -> Vec
     let node_binary = internal_to_binary(node, false);
     let mut id_bytes: Vec<u8> = Vec::new();
     for part in id {
-        id_bytes.extend(&(part as u32).to_be_bytes());
+        id_bytes.extend(part.to_be_bytes());
     }
 
     let mut buffer = Vec::with_capacity(node_binary.len() + id_bytes.len() + 5);
@@ -383,9 +379,9 @@ fn reference(node: RawTerm, id: Vec<u32>, creation: u8, add_prefix: bool) -> Vec
         push_prefix(&mut buffer)
     };
     buffer.push(NEW_REFERENCE_EXT);
-    buffer.extend(&(id_length as u16).to_be_bytes());
+    buffer.extend((id_length as u16).to_be_bytes());
     buffer.extend(node_binary);
-    buffer.extend(&creation.to_be_bytes());
+    buffer.extend(creation.to_be_bytes());
     buffer.extend(id_bytes);
     buffer
 }
@@ -395,7 +391,7 @@ fn newer_reference(node: RawTerm, id: Vec<u32>, creation: u32, add_prefix: bool)
     let node_binary = internal_to_binary(node, false);
     let mut id_bytes: Vec<u8> = Vec::new();
     for part in id {
-        id_bytes.extend(&(part as u32).to_be_bytes());
+        id_bytes.extend(part.to_be_bytes());
     }
 
     let mut buffer = Vec::with_capacity(node_binary.len() + id_bytes.len() + 5);
@@ -404,9 +400,9 @@ fn newer_reference(node: RawTerm, id: Vec<u32>, creation: u32, add_prefix: bool)
         push_prefix(&mut buffer)
     };
     buffer.push(NEWER_REFERENCE_EXT);
-    buffer.extend(&(id_length as u16).to_be_bytes());
+    buffer.extend((id_length as u16).to_be_bytes());
     buffer.extend(node_binary);
-    buffer.extend(&creation.to_be_bytes());
+    buffer.extend(creation.to_be_bytes());
     buffer.extend(id_bytes);
     buffer
 }
@@ -421,8 +417,8 @@ fn pid(node: RawTerm, id: u32, serial: u32, creation: u8, add_prefix: bool) -> V
     };
     buffer.push(PID_EXT);
     buffer.extend(node_binary);
-    buffer.extend(&(id as u32).to_be_bytes());
-    buffer.extend(&(serial as u32).to_be_bytes());
+    buffer.extend(id.to_be_bytes());
+    buffer.extend(serial.to_be_bytes());
     buffer.push(creation);
     buffer
 }
@@ -436,9 +432,9 @@ fn new_pid(node: RawTerm, id: u32, serial: u32, creation: u32, add_prefix: bool)
     };
     buffer.push(NEW_PID_EXT);
     buffer.extend(node_binary);
-    buffer.extend(&(id as u32).to_be_bytes());
-    buffer.extend(&(serial as u32).to_be_bytes());
-    buffer.extend(&(creation as u32).to_be_bytes());
+    buffer.extend(id.to_be_bytes());
+    buffer.extend(serial.to_be_bytes());
+    buffer.extend(creation.to_be_bytes());
     buffer
 }
 fn function(
@@ -469,11 +465,11 @@ fn function(
         push_prefix(&mut buffer)
     };
     buffer.push(NEW_FUN_EXT);
-    buffer.extend(&size.to_be_bytes());
+    buffer.extend(size.to_be_bytes());
     buffer.push(arity);
-    buffer.extend(&uniq);
-    buffer.extend(&index.to_be_bytes());
-    buffer.extend(&(free_var_length as u32).to_be_bytes());
+    buffer.extend(uniq);
+    buffer.extend(index.to_be_bytes());
+    buffer.extend((free_var_length as u32).to_be_bytes());
     buffer.extend(module_binary);
     buffer.extend(old_index);
     buffer.extend(old_uniq);

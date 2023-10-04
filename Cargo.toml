@@ -26,6 +26,7 @@ serde_derive = {version = "1.0", optional = true}
 serde_json = {version = "1.0", optional = true}
 strum = { version = "0.24", features = ["derive"] }
 ordered-float = "3.0.0"
+eetf = {version = "0.9", optional = true}
 
 [dev-dependencies]
 brunch = "0.2.6"
@@ -33,6 +34,7 @@ brunch = "0.2.6"
 [features]
 serde_impl = ["serde", "serde_derive", "serde_json", "keylist/serde", "num-bigint/serde", "ordered-float/serde"]
 zlib = ["flate2"]
+eetf_conversion = ["eetf"]
 
 [[bench]]
 name = "keylist_vs_btree"

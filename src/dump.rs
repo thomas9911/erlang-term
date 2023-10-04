@@ -75,6 +75,11 @@ pub fn internal_to_binary(raw: RawTerm, add_prefix: bool) -> Vec<u8> {
         } => function(
             size, arity, uniq, index, *module, *old_index, *old_uniq, *pid, free_var, add_prefix,
         ),
+        ExternalFunction {
+            module,
+            function,
+            arity,
+        } => external_function(*module, *function, arity, add_prefix),
         Improper(_) => unreachable!(),
     }
 }
@@ -478,6 +483,24 @@ fn function(
     buffer
 }
 
+fn external_function(module: RawTerm, function: RawTerm, arity: u8, add_prefix: bool) -> Vec<u8> {
+    let module_binary = internal_to_binary(module, false);
+    let function_binary = internal_to_binary(function, false);
+    let arity_binary = small_int(arity, false);
+
+    let mut buffer = Vec::with_capacity(module_binary.len() + function_binary.len() + 2);
+
+    if add_prefix {
+        push_prefix(&mut buffer)
+    };
+    buffer.push(EXPORT_EXT);
+    buffer.extend(module_binary);
+    buffer.extend(function_binary);
+    buffer.extend(arity_binary);
+
+    buffer
+}
+
 fn sign_to_byte(sign: Sign) -> u8 {
     match sign {
         Sign::Minus => 1,
@@ -866,6 +889,25 @@ mod binary_tests {
                 100, 0, 4, 110, 111, 110, 101, 100, 0, 4, 110, 111, 110, 101, 108, 0, 0, 0, 1, 104,
                 5, 100, 0, 6, 99, 108, 97, 117, 115, 101, 97, 3, 106, 106, 108, 0, 0, 0, 1, 104, 3,
                 100, 0, 4, 97, 116, 111, 109, 97, 0, 100, 0, 3, 110, 105, 108, 106, 106
+            ]
+        )
+    }
+
+    #[test]
+    fn external_function() {
+        let input = RawTerm::ExternalFunction {
+            module: Box::new(RawTerm::AtomDeprecated("erlang".to_string())),
+            function: Box::new(RawTerm::AtomDeprecated("xor".to_string())),
+            arity: 2,
+        };
+
+        let out = to_bytes(input);
+
+        assert_eq!(
+            out,
+            vec![
+                REVISION, 113, 100, 0, 6, 101, 114, 108, 97, 110, 103, 100, 0, 3, 120, 111, 114,
+                97, 2
             ]
         )
     }

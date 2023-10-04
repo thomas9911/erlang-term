@@ -76,9 +76,13 @@ pub enum RawTerm {
         pid: Box<RawTerm>,
         free_var: Vec<RawTerm>,
     },
+    ExternalFunction {
+        module: Box<RawTerm>,
+        function: Box<RawTerm>,
+        arity: u8,
+    },
     // NEWER_REFERENCE,
     // FUN,
-    // EXPORT,
     // BIT_BINARY,
     Float(OrderedFloat<f64>),
     Atom(String),
@@ -320,6 +324,7 @@ impl From<&RawTermType> for RawTermGeneralType {
             Ref => RawTermGeneralType::Reference,
             NewerRef => RawTermGeneralType::Reference,
             Function => RawTermGeneralType::Fun,
+            ExternalFunction => RawTermGeneralType::Fun,
             Float => RawTermGeneralType::Number,
             Atom => RawTermGeneralType::Atom,
             SmallAtom => RawTermGeneralType::Atom,
@@ -770,6 +775,20 @@ mod from_term_tests {
         let out = RawTerm::from_bytes(input).unwrap();
         assert_eq!(expected, out);
         assert_eq!(&expected.to_bytes(), input);
+    }
+
+    #[test]
+    fn external_function() {
+        let input = read_binary("bins/external_function.bin").unwrap();
+        let out = from_bytes(&input).unwrap();
+
+        let expected = RawTerm::ExternalFunction {
+            module: Box::new(RawTerm::AtomDeprecated("Elixir.IO".to_string())),
+            function: Box::new(RawTerm::AtomDeprecated("inspect".to_string())),
+            arity: 1,
+        };
+
+        assert_eq!(expected, out);
     }
 
     #[test]

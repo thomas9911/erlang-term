@@ -48,6 +48,7 @@ defmodule TermGenerator do
         # Port.close(port)
 
         # save(make_ref(), "ref")
+        save(&IO.inspect/1, "external_function")
         save_gzip(Enum.to_list(0..1000), "number_list_gzip")
     end
 

@@ -104,6 +104,8 @@ use std::fs::File;
 use std::io::{Read, Result as IoResult};
 
 pub mod consts;
+#[cfg(feature = "eetf_conversion")]
+pub mod conversion_eetf;
 pub mod dump;
 pub mod parse;
 pub mod raw_term;

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- support for external function or mfa (in ETF called EXPORT_EXT)
+
 ## [1.1.0] - 25-03-23
 
 ### Added

@@ -54,6 +54,7 @@ fn term(input: &[u8]) -> IResult<&[u8], RawTerm> {
         NEW_REFERENCE_EXT => reference_new,
         NEWER_REFERENCE_EXT => reference_newer,
         NEW_FUN_EXT => function,
+        EXPORT_EXT => external_function,
         _ => {
             return Err(Err::Error(nom::error::Error::new(input, ErrorKind::NoneOf)));
         }
@@ -89,6 +90,7 @@ fn term(input: &[u8]) -> IResult<&[u8], RawTerm> {
         NEW_REFERENCE_EXT => reference_new,
         NEWER_REFERENCE_EXT => reference_newer,
         NEW_FUN_EXT => function,
+        EXPORT_EXT => external_function,
         ZLIB => gzip,
         _ => {
             return Err(Err::Error(nom::error::Error::new(input, ErrorKind::NoneOf)));
@@ -313,6 +315,26 @@ fn function(input: &[u8]) -> IResult<&[u8], RawTerm> {
             old_uniq: Box::new(old_uniq),
             pid: Box::new(pid),
             free_var: free_vars,
+        },
+    ))
+}
+
+fn external_function(input: &[u8]) -> IResult<&[u8], RawTerm> {
+    let get_data = tuple((node_or_module, node_or_module, small_int));
+
+    let (i, (module, function, arity)) = preceded(tag(&[EXPORT_EXT]), get_data)(input)?;
+
+    let arity = match arity {
+        RawTerm::SmallInt(x) => x,
+        _ => unreachable!(),
+    };
+
+    Ok((
+        i,
+        RawTerm::ExternalFunction {
+            module: Box::new(module),
+            function: Box::new(function),
+            arity,
         },
     ))
 }
